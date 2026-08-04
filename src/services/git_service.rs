@@ -70,6 +70,18 @@ impl GitService {
             None
         }
     }
+
+    pub fn is_git_repository(&self, working_dir: &Path) -> Result<bool> {
+        let output = Command::new("git")
+            .args(["rev-parse", "--is-inside-work-tree"])
+            .current_dir(working_dir)
+            .output();
+
+        match output {
+            Ok(out) => Ok(out.status.success()),
+            Err(_) => Ok(false),
+        }
+    }
 }
 
 impl Default for GitService {

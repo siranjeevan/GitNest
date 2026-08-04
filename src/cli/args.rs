@@ -11,7 +11,7 @@ use std::path::PathBuf;
 )]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -76,6 +76,21 @@ pub enum Commands {
     Import {
         /// Source ZIP file input path
         input: PathBuf,
+    },
+
+    /// Create a new GitHub repository directly from terminal and map it
+    #[command(alias = "cr")]
+    Create {
+        /// Repository name to create on GitHub
+        name: String,
+
+        /// Make repository private (default: false / public)
+        #[arg(short, long)]
+        private: bool,
+
+        /// Account ID or GitHub username to create repository under
+        #[arg(short, long)]
+        account: Option<String>,
     },
 
     /// Clone a repository using a selected GitNest identity

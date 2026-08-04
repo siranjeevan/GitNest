@@ -207,4 +207,41 @@ impl GitProvider for GitHubProvider {
 
         Ok(())
     }
+
+    async fn create_repository(&self, token: &str, name: &str, private: bool) -> Result<String> {
+        let payload = serde_json::json!({
+            "name": name,
+            "private": private,
+            "auto_init": false,
+        });
+
+        let res = self
+            .client
+            .post("https://api.github.com/user/repos")
+            .header("Authorization", format!("token {}", token))
+            .header("Accept", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| GitNestError::OAuthError(e.to_string()))?;
+
+        if !res.status().is_success() {
+            let err_text = res.text().await.unwrap_or_default();
+            return Err(GitNestError::OAuthError(format!(
+                "Failed to create repository on GitHub: {}",
+                err_text
+            )));
+        }
+
+        let body: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| GitNestError::OAuthError(e.to_string()))?;
+
+        let ssh_url = body["ssh_url"]
+            .as_str()
+            .ok_or_else(|| GitNestError::OAuthError("Missing ssh_url in GitHub response".to_string()))?;
+
+        Ok(ssh_url.to_string())
+    }
 }

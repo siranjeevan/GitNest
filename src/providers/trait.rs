@@ -25,4 +25,5 @@ pub trait GitProvider: Send + Sync {
     async fn poll_for_token(&self, device_code: &str, interval: u64) -> Result<String>;
     async fn fetch_user_info(&self, token: &str) -> Result<ProviderUser>;
     async fn upload_ssh_key(&self, token: &str, title: &str, pub_key: &str) -> Result<()>;
+    async fn create_repository(&self, token: &str, name: &str, private: bool) -> Result<String>;
 }

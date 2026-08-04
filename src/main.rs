@@ -22,8 +22,15 @@ async fn main() {
         }
     }
 
-    if let Err(err) = handle_command(cli.command, config_mgr).await {
-        eprintln!("\nError: {}\n", err);
-        exit(1);
+    match cli.command {
+        Some(cmd) => {
+            if let Err(err) = handle_command(cmd, config_mgr).await {
+                eprintln!("\nError: {}\n", err);
+                exit(1);
+            }
+        }
+        None => {
+            gitnest::cli::handlers::render_dashboard(&config_mgr).await;
+        }
     }
 }

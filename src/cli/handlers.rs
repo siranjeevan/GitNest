@@ -41,7 +41,7 @@ pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<
         },
         Commands::Project { command } => match command {
             ProjectCommands::Add { path, account } => {
-                handle_project_add(&project_service, &account_service, path, account).await
+                handle_project_add(&config_mgr, &project_service, &account_service, path, account).await
             }
             ProjectCommands::Remove { path } => {
                 let raw_path = path.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
@@ -68,6 +68,11 @@ pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<
             println!("Successfully imported backup from {:?}", input);
             Ok(())
         }
+        Commands::Create {
+            name,
+            private,
+            account,
+        } => handle_create(&config_mgr, &project_service, &account_service, &ssh_service, &git_service, &name, private, account).await,
         Commands::Clone {
             url,
             target_dir,
@@ -203,6 +208,7 @@ async fn handle_accounts(account_service: &AccountService) -> Result<()> {
 }
 
 async fn handle_project_add(
+    config_mgr: &ConfigManager,
     project_service: &ProjectService,
     account_service: &AccountService,
     path: Option<PathBuf>,
@@ -236,6 +242,32 @@ async fn handle_project_add(
     };
 
     let proj = project_service.map_project(&raw_path, &selected_account.id).await?;
+
+    // Configure local repository core.sshCommand so IDE GUI buttons (VS Code / Antigravity) use GitNest SSH key
+    let ssh_key_path = config_mgr.ssh_dir().join(&selected_account.key_id);
+    let _ = std::process::Command::new("git")
+        .args([
+            "config",
+            "--local",
+            "core.sshCommand",
+            &format!(
+                "ssh -i \"{}\" -o IdentitiesOnly=yes",
+                ssh_key_path.to_string_lossy()
+            ),
+        ])
+        .current_dir(&proj.path)
+        .output();
+
+    // Set local user.name and user.email so commits use the mapped GitHub identity
+    let _ = std::process::Command::new("git")
+        .args(["config", "--local", "user.name", &selected_account.github_username])
+        .current_dir(&proj.path)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "--local", "user.email", &selected_account.email])
+        .current_dir(&proj.path)
+        .output();
+
     println!("Project {:?} successfully mapped to account: {}", proj.path, selected_account.github_username);
     Ok(())
 }
@@ -417,7 +449,18 @@ async fn handle_clone(
     let key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
     let cwd = env::current_dir()?;
 
-    let mut clone_args = vec!["clone", url];
+    // Convert HTTPS URL (https://github.com/owner/repo.git) to SSH URL (git@github.com:owner/repo.git) if passed
+    let ssh_converted_url: String;
+    let effective_url = if url.starts_with("https://github.com/") {
+        let path_part = url.trim_start_matches("https://github.com/");
+        ssh_converted_url = format!("git@github.com:{}", path_part);
+        println!("Converting HTTPS URL to SSH identity format: {}", ssh_converted_url);
+        &ssh_converted_url
+    } else {
+        url
+    };
+
+    let mut clone_args = vec!["clone", effective_url];
     let dest_str;
     if let Some(ref dest) = target_dir {
         dest_str = dest.to_string_lossy().to_string();
@@ -431,10 +474,139 @@ async fn handle_clone(
             cwd.join(name)
         });
         project_service.map_project(&cloned_path, &selected_acc.id).await?;
+
+        // Set local user.name, user.email, and core.sshCommand
+        let ssh_key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
+        let _ = std::process::Command::new("git")
+            .args(["config", "--local", "user.name", &selected_acc.github_username])
+            .current_dir(&cloned_path)
+            .output();
+        let _ = std::process::Command::new("git")
+            .args(["config", "--local", "user.email", &selected_acc.email])
+            .current_dir(&cloned_path)
+            .output();
+        let _ = std::process::Command::new("git")
+            .args(["config", "--local", "core.sshCommand",
+                &format!("ssh -i \"{}\" -o IdentitiesOnly=yes", ssh_key_path.to_string_lossy())])
+            .current_dir(&cloned_path)
+            .output();
+
         println!("Clone complete! Mapped {:?} to {}", cloned_path, selected_acc.github_username);
     } else {
         return Err(GitNestError::GitExecutionFailed(format!("Git clone exited with code {}", exit_code)));
     }
+    Ok(())
+}
+
+async fn handle_create(
+    config_mgr: &ConfigManager,
+    project_service: &ProjectService,
+    account_service: &AccountService,
+    ssh_service: &SshService,
+    git_service: &GitService,
+    name: &str,
+    private: bool,
+    account_opt: Option<String>,
+) -> Result<()> {
+    let accounts = account_service.list_accounts().await?;
+    if accounts.is_empty() {
+        return Err(GitNestError::AccountNotFound(
+            "No accounts found. Run `gitnest login` first.".to_string(),
+        ));
+    }
+
+    let selected_acc = match account_opt {
+        Some(t) => accounts
+            .into_iter()
+            .find(|a| a.id == t || a.github_username == t)
+            .ok_or_else(|| GitNestError::AccountNotFound(t))?,
+        None => {
+            println!("Select GitHub Account to create repository under:");
+            for (idx, acc) in accounts.iter().enumerate() {
+                println!("  [{}] {} ({})", idx + 1, acc.github_username, acc.email);
+            }
+            print!("Enter choice [1-{}]: ", accounts.len());
+            io::stdout().flush().ok();
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let choice: usize = input.trim().parse().unwrap_or(1);
+            accounts[choice - 1].clone()
+        }
+    };
+
+    let secure_store = KeyringSecureStore::new();
+    let token = secure_store
+        .get_token(&selected_acc.github_username)?
+        .ok_or_else(|| {
+            GitNestError::CredentialError(format!(
+                "Token for {} not found in keyring. Please re-run `gitnest login`.",
+                selected_acc.github_username
+            ))
+        })?;
+
+    let config = config_mgr.load_config()?;
+    let provider = GitHubProvider::new(&config.github.client_id);
+
+    println!(
+        "Creating {} repository '{}' under GitHub account {}...",
+        if private { "private" } else { "public" },
+        name,
+        selected_acc.github_username
+    );
+
+    let ssh_url = provider.create_repository(&token, name, private).await?;
+    println!("Repository created on GitHub: {}", ssh_url);
+
+    let cwd = env::current_dir()?;
+    let project_dir = cwd.join(name);
+    if !project_dir.exists() {
+        std::fs::create_dir_all(&project_dir)?;
+    }
+
+    // Initialize local git repository if not already initialized
+    if !git_service.is_git_repository(&project_dir)? {
+        let _ = std::process::Command::new("git")
+            .arg("init")
+            .current_dir(&project_dir)
+            .output();
+    }
+
+    let _ = std::process::Command::new("git")
+        .args(["remote", "add", "origin", &ssh_url])
+        .current_dir(&project_dir)
+        .output();
+
+    let ssh_key_path = config_mgr.ssh_dir().join(&selected_acc.key_id);
+    let _ = std::process::Command::new("git")
+        .args([
+            "config",
+            "--local",
+            "core.sshCommand",
+            &format!(
+                "ssh -i \"{}\" -o IdentitiesOnly=yes",
+                ssh_key_path.to_string_lossy()
+            ),
+        ])
+        .current_dir(&project_dir)
+        .output();
+
+    // Set local user.name and user.email so commits use the mapped identity
+    let _ = std::process::Command::new("git")
+        .args(["config", "--local", "user.name", &selected_acc.github_username])
+        .current_dir(&project_dir)
+        .output();
+    let _ = std::process::Command::new("git")
+        .args(["config", "--local", "user.email", &selected_acc.email])
+        .current_dir(&project_dir)
+        .output();
+
+    project_service.map_project(&project_dir, &selected_acc.id).await?;
+
+    println!(
+        "Successfully created and mapped repository at {:?} to {}",
+        project_dir, selected_acc.github_username
+    );
+
     Ok(())
 }
 
@@ -519,4 +691,99 @@ async fn handle_status(
     }
     println!("=======================================================\n");
     Ok(())
+}
+
+pub async fn render_dashboard(config_mgr: &ConfigManager) {
+    // ANSI color codes
+    let cyan = "\x1b[36m";
+    let green = "\x1b[32m";
+    let yellow = "\x1b[33m";
+    let magenta = "\x1b[35m";
+    let bold = "\x1b[1m";
+    let dim = "\x1b[2m";
+    let reset = "\x1b[0m";
+    let blue = "\x1b[34m";
+    let white = "\x1b[97m";
+
+    println!();
+    println!("   {green}{bold} ██████  ██ ████████ ███    ██ ███████ ███████ ████████{reset}");
+    println!("   {green}{bold}██       ██    ██    ████   ██ ██      ██         ██   {reset}");
+    println!("   {green}{bold}██   ███ ██    ██    ██ ██  ██ █████   ███████    ██   {reset}");
+    println!("   {green}{bold}██    ██ ██    ██    ██  ██ ██ ██           ██    ██   {reset}");
+    println!("   {green}{bold} ██████  ██    ██    ██   ████ ███████ ███████    ██   {reset}");
+    println!();
+    println!("   {yellow}One Workspace. Multiple Git Identities.{reset} {dim}(v1.0.0){reset}");
+    println!();
+
+    let account_repo = Arc::new(Mutex::new(JsonAccountRepository::new(config_mgr.accounts_path())));
+    let project_repo = Arc::new(Mutex::new(JsonProjectRepository::new(config_mgr.projects_path())));
+
+    let account_service = AccountService::new(account_repo);
+    let project_service = ProjectService::new(project_repo);
+
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    println!("  {cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{reset}");
+    if let Ok(Some(proj)) = project_service.find_project(&cwd).await {
+        if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
+            println!("   {white}{bold}Active Context{reset}  : {green}{bold}Mapped Repository{reset} ({cyan}{}{reset})", proj.name);
+            println!("   {white}{bold}GitHub Account{reset}  : {magenta}{bold}{}{reset} {dim}({}){reset}", acc.github_username, acc.email);
+        }
+    } else {
+        println!("   {white}{bold}Active Context{reset}  : {yellow}Unmapped Directory{reset} ({dim}{:?}{reset})", cwd);
+        println!("   {yellow}Tip: Run `gitnest project add` to map this directory!{reset}");
+    }
+    println!("  {cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{reset}");
+    println!();
+
+    use comfy_table::presets::UTF8_FULL_CONDENSED;
+    use comfy_table::*;
+
+    let mut table = Table::new();
+    table
+        .load_preset(UTF8_FULL_CONDENSED)
+        .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_header(vec![
+            Cell::new("COMMAND")
+                .add_attribute(Attribute::Bold)
+                .fg(Color::Cyan),
+            Cell::new("ALIAS")
+                .add_attribute(Attribute::Bold)
+                .fg(Color::Yellow),
+            Cell::new("DESCRIPTION")
+                .add_attribute(Attribute::Bold)
+                .fg(Color::Green),
+        ]);
+
+    let features: Vec<(&str, &str, &str)> = vec![
+        ("gitnest init",        "i",   "Initialize GitNest directory structure (~/.gitnest)"),
+        ("gitnest login",       "l",   "Authenticate GitHub via OAuth & auto-setup SSH key"),
+        ("gitnest create <n>",  "cr",  "Create repo on GitHub from terminal & auto-map it"),
+        ("gitnest clone <url>", "cl",  "Clone repo (SSH or HTTPS URL) & auto-map identity"),
+        ("gitnest accounts",    "a",   "List all registered GitHub accounts"),
+        ("gitnest projects",    "ls",  "List all mapped project folders & GitHub accounts"),
+        ("gitnest current",     "c",   "Display identity mapped to current directory"),
+        ("gitnest scan [path]", "sc",  "Recursively scan folder for repos & batch map"),
+        ("gitnest push [args]", "p",   "Push commits using mapped account SSH key"),
+        ("gitnest pull [args]", "pl",  "Pull changes using mapped account SSH key"),
+        ("gitnest doctor",      "dr",  "Run full system health & network diagnostics"),
+        ("gitnest version",     "v",   "Display version, OS, Rust, and path details"),
+        ("gitnest export",      "ex",  "Export backup ZIP archive (config, keys, accounts)"),
+        ("gitnest import <z>",  "im",  "Restore backup from ZIP archive"),
+        ("gitnest status",      "s",   "Show rich system status and repo state"),
+    ];
+
+    for (cmd, alias, desc) in features {
+        table.add_row(vec![
+            Cell::new(cmd).fg(Color::White),
+            Cell::new(alias).fg(Color::Yellow),
+            Cell::new(desc).fg(Color::White),
+        ]);
+    }
+
+    println!("  {blue}{bold}Available Commands & Features:{reset}\n");
+    println!("{}", table);
+    println!();
+    println!("  {dim}Tip: Type `gitnest --help` for detailed command options.{reset}");
+    println!("  {dim}     Run `gitnest <command> --help` for specific command help.{reset}");
+    println!();
 }
