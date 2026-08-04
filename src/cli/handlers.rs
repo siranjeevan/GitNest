@@ -681,6 +681,29 @@ async fn execute_ephemeral_git_cmd(
     println!("Executing `git {}` as GitHub identity: {}...", cmd_name, account.github_username);
     let code = git_service.execute_ephemeral(&project.path, &account, &key_path, &command_args)?;
 
+    // Auto-detect "no upstream branch" and retry with --set-upstream
+    if code != 0 && cmd_name == "push" && !extra_args.iter().any(|a| a.contains("set-upstream") || a == "-u") {
+        // Get current branch name
+        let branch_output = std::process::Command::new("git")
+            .args(["rev-parse", "--abbrev-ref", "HEAD"])
+            .current_dir(&project.path)
+            .output();
+
+        if let Ok(out) = branch_output {
+            let branch = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !branch.is_empty() {
+                println!("No upstream branch set. Auto-setting upstream to origin/{}...", branch);
+                let retry_args = vec!["push", "--set-upstream", "origin", &branch];
+                let retry_code = git_service.execute_ephemeral(&project.path, &account, &key_path, &retry_args)?;
+                if retry_code != 0 {
+                    return Err(GitNestError::GitExecutionFailed(format!("git push --set-upstream failed with exit code {}", retry_code)));
+                }
+                return Ok(());
+            }
+        }
+        return Err(GitNestError::GitExecutionFailed(format!("git {} failed with exit code {}", cmd_name, code)));
+    }
+
     if code != 0 {
         return Err(GitNestError::GitExecutionFailed(format!("git {} failed with exit code {}", cmd_name, code)));
     }
