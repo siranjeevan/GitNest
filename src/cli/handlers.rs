@@ -554,7 +554,37 @@ async fn handle_create(
         selected_acc.github_username
     );
 
-    let ssh_url = provider.create_repository(&token, name, private).await?;
+    let mut ssh_url = match provider.create_repository(&token, name, private).await {
+        Ok(url) => url,
+        Err(_) => {
+            println!("\nToken expired or missing permissions. Re-authenticating...\n");
+
+            // Trigger fresh OAuth login flow
+            let device_res = provider.request_device_code().await?;
+            let clipboard_status = match arboard::Clipboard::new() {
+                Ok(mut clipboard) => match clipboard.set_text(&device_res.user_code) {
+                    Ok(_) => " (Code copied to clipboard!)",
+                    Err(_) => "",
+                },
+                Err(_) => "",
+            };
+            println!("=======================================================");
+            println!("  GitHub Verification Code: {}", device_res.user_code);
+            println!("=======================================================");
+            println!("Code copied to clipboard!{}", clipboard_status);
+            println!("\nPress [ENTER] to open browser ({}) and authorize...", device_res.verification_uri);
+            io::stdout().flush().ok();
+            let mut dummy = String::new();
+            io::stdin().read_line(&mut dummy).ok();
+            let _ = open::that(&device_res.verification_uri);
+
+            let new_token = provider.poll_for_token(&device_res.device_code, device_res.interval).await?;
+            secure_store.store_token(&selected_acc.github_username, &new_token)?;
+            println!("Re-authenticated successfully!\n");
+
+            provider.create_repository(&new_token, name, private).await?
+        }
+    };
     println!("Repository created on GitHub: {}", ssh_url);
 
     let cwd = env::current_dir()?;

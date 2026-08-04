@@ -50,7 +50,7 @@ impl GitProvider for GitHubProvider {
     async fn request_device_code(&self) -> Result<DeviceCodeResponse> {
         let params = [
             ("client_id", self.client_id.as_str()),
-            ("scope", "read:user user:email admin:public_key"),
+            ("scope", "repo read:user user:email admin:public_key"),
         ];
 
         let res = self
