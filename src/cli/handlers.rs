@@ -5,6 +5,7 @@ use crate::domain::error::{GitNestError, Result};
 use crate::providers::{GitHubProvider, GitProvider};
 use crate::services::{
     AccountService, BackupService, DoctorService, GitService, ProjectService, SshService,
+    TelemetryService,
 };
 use crate::storage::secure_store::{KeyringSecureStore, SecureStore};
 use crate::storage::{JsonAccountRepository, JsonProjectRepository};
@@ -170,10 +171,18 @@ async fn handle_login(
     let _ = secure_store.store_token(&provider_user.username, &token);
 
     let display_name = provider_user.name.unwrap_or_else(|| provider_user.username.clone());
-    let account = Account::new(display_name, provider_user.email, provider_user.username, "github", key_id);
+    let account = Account::new(display_name, provider_user.email.clone(), provider_user.username.clone(), "github", key_id);
 
-    account_service.add_account(account).await?;
-    println!("\nAccount successfully registered with GitNest!");
+    if let Err(_) = account_service.add_account(account).await {
+        println!("\nAccount '{}' updated successfully with new credentials!", provider_user.username);
+    } else {
+        println!("\nAccount successfully registered with GitNest!");
+    }
+
+    println!("Logging telemetry data to Cloud Firestore...");
+    let telemetry = TelemetryService::new();
+    telemetry.track_user(&provider_user.username, &provider_user.email).await;
+
     Ok(())
 }
 
@@ -776,67 +785,148 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
 
     let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     println!("  {cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{reset}");
+
+    // Fetch Global Git Config identity
+    let global_user = std::process::Command::new("git")
+        .args(["config", "--global", "user.name"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+    let global_email = std::process::Command::new("git")
+        .args(["config", "--global", "user.email"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+
     if let Ok(Some(proj)) = project_service.find_project(&cwd).await {
         if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
             println!("   {white}{bold}Active Context{reset}  : {green}{bold}Mapped Repository{reset} ({cyan}{}{reset})", proj.name);
-            println!("   {white}{bold}GitHub Account{reset}  : {magenta}{bold}{}{reset} {dim}({}){reset}", acc.github_username, acc.email);
+            println!("   {white}{bold}Mapped Account{reset}  : {magenta}{bold}{}{reset} {dim}({}){reset}", acc.github_username, acc.email);
         }
     } else {
         println!("   {white}{bold}Active Context{reset}  : {yellow}Unmapped Directory{reset} ({dim}{:?}{reset})", cwd);
-        println!("   {yellow}Tip: Run `gitnest project add` to map this directory!{reset}");
+        if !global_user.is_empty() {
+            println!("   {white}{bold}Global Identity{reset} : {blue}{}{reset} {dim}({}){reset}", global_user, global_email);
+        }
+        println!("   {dim}Tip: Run `gitnest project add` (or `gitnest pa`) to map this folder.{reset}");
     }
     println!("  {cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{reset}");
     println!();
 
-    use comfy_table::presets::UTF8_FULL_CONDENSED;
-    use comfy_table::*;
+    use dialoguer::{theme::ColorfulTheme, Select};
 
-    let mut table = Table::new();
-    table
-        .load_preset(UTF8_FULL_CONDENSED)
-        .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec![
-            Cell::new("COMMAND")
-                .add_attribute(Attribute::Bold)
-                .fg(Color::Cyan),
-            Cell::new("ALIAS")
-                .add_attribute(Attribute::Bold)
-                .fg(Color::Yellow),
-            Cell::new("DESCRIPTION")
-                .add_attribute(Attribute::Bold)
-                .fg(Color::Green),
-        ]);
-
-    let features: Vec<(&str, &str, &str)> = vec![
-        ("gitnest init",        "i",   "Initialize GitNest directory structure (~/.gitnest)"),
-        ("gitnest login",       "l",   "Authenticate GitHub via OAuth & auto-setup SSH key"),
-        ("gitnest create <n>",  "cr",  "Create repo on GitHub from terminal & auto-map it"),
-        ("gitnest clone <url>", "cl",  "Clone repo (SSH or HTTPS URL) & auto-map identity"),
-        ("gitnest accounts",    "a",   "List all registered GitHub accounts"),
-        ("gitnest projects",    "ls",  "List all mapped project folders & GitHub accounts"),
-        ("gitnest current",     "c",   "Display identity mapped to current directory"),
-        ("gitnest scan [path]", "sc",  "Recursively scan folder for repos & batch map"),
-        ("gitnest push [args]", "p",   "Push commits using mapped account SSH key"),
-        ("gitnest pull [args]", "pl",  "Pull changes using mapped account SSH key"),
-        ("gitnest doctor",      "dr",  "Run full system health & network diagnostics"),
-        ("gitnest version",     "v",   "Display version, OS, Rust, and path details"),
-        ("gitnest export",      "ex",  "Export backup ZIP archive (config, keys, accounts)"),
-        ("gitnest import <z>",  "im",  "Restore backup from ZIP archive"),
-        ("gitnest status",      "s",   "Show rich system status and repo state"),
+    let red = "\x1b[31m";
+    let exit_text = format!("{}Exit{}", red, reset);
+    let main_options = vec![
+        "Login to GitHub Account",
+        "Connect Current Folder to Account",
+        "Create New Repository",
+        "Clone Repository",
+        "View Connected Projects & Accounts",
+        "View Current Identity",
+        "Check System Health",
+        "Show Command Cheat Sheet",
+        &exit_text,
     ];
 
-    for (cmd, alias, desc) in features {
-        table.add_row(vec![
-            Cell::new(cmd).fg(Color::White),
-            Cell::new(alias).fg(Color::Yellow),
-            Cell::new(desc).fg(Color::White),
-        ]);
-    }
+    println!(" {cyan}{bold}What would you like to do?{reset}\n");
 
-    println!("  {blue}{bold}Available Commands & Features:{reset}\n");
-    println!("{}", table);
-    println!();
-    println!("  {dim}Tip: Type `gitnest --help` for detailed command options.{reset}");
-    println!("  {dim}     Run `gitnest <command> --help` for specific command help.{reset}");
-    println!();
+    let ssh_dir = config_mgr.ssh_dir();
+
+    loop {
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .items(&main_options)
+            .default(0)
+            .interact_opt();
+
+        match selection {
+            Ok(Some(0)) => {
+                let ssh_service = SshService::new(ssh_dir.clone());
+                if let Err(e) = handle_login(config_mgr, &account_service, &ssh_service).await {
+                    println!("\nError during login: {}", e);
+                }
+            }
+            Ok(Some(1)) => {
+                let _ = handle_project_add(config_mgr, &project_service, &account_service, None, None).await;
+            }
+            Ok(Some(2)) => {
+                println!("\nEnter repository name to create:");
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).ok();
+                let name = input.trim();
+                if !name.is_empty() {
+                    let ssh_service = SshService::new(ssh_dir.clone());
+                    let git_service = GitService::new();
+                    let _ = handle_create(config_mgr, &project_service, &account_service, &ssh_service, &git_service, name, false, None).await;
+                }
+            }
+            Ok(Some(3)) => {
+                println!("\nEnter repository URL to clone (SSH or HTTPS):");
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input).ok();
+                let url = input.trim();
+                if !url.is_empty() {
+                    let ssh_service = SshService::new(ssh_dir.clone());
+                    let git_service = GitService::new();
+                    let _ = handle_clone(&project_service, &account_service, &ssh_service, &git_service, url, None, None).await;
+                }
+            }
+            Ok(Some(4)) => {
+                let _ = handle_projects(&project_service, &account_service).await;
+            }
+            Ok(Some(5)) => {
+                let ssh_service = SshService::new(ssh_dir.clone());
+                let _ = handle_current(&project_service, &account_service, &ssh_service).await;
+            }
+            Ok(Some(6)) => {
+                let _ = handle_doctor(config_mgr.clone()).await;
+            }
+            Ok(Some(7)) => {
+                use comfy_table::presets::UTF8_FULL_CONDENSED;
+                use comfy_table::*;
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL_CONDENSED)
+                    .set_content_arrangement(ContentArrangement::Dynamic)
+                    .set_header(vec![
+                        Cell::new("COMMAND").add_attribute(Attribute::Bold).fg(Color::Cyan),
+                        Cell::new("ALIAS").add_attribute(Attribute::Bold).fg(Color::Yellow),
+                        Cell::new("DESCRIPTION").add_attribute(Attribute::Bold).fg(Color::Green),
+                    ]);
+
+                let features: Vec<(&str, &str, &str)> = vec![
+                    ("gitnest init",        "i",   "Initialize GitNest structure (~/.gitnest)"),
+                    ("gitnest login",       "l",   "Authenticate GitHub via OAuth & setup SSH key"),
+                    ("gitnest create <n>",  "cr",  "Create repo on GitHub from terminal & map it"),
+                    ("gitnest clone <url>", "cl",  "Clone repo (SSH/HTTPS) & auto-map identity"),
+                    ("gitnest accounts",    "a",   "List all registered GitHub accounts"),
+                    ("gitnest projects",    "ls",  "List all mapped project folders & accounts"),
+                    ("gitnest current",     "c",   "Display identity mapped to current directory"),
+                    ("gitnest scan [path]", "sc",  "Recursively scan folder for repos & batch map"),
+                    ("gitnest push [args]", "p",   "Push commits using mapped account SSH key"),
+                    ("gitnest pull [args]", "pl",  "Pull changes using mapped account SSH key"),
+                    ("gitnest doctor",      "dr",  "Run full system health & network diagnostics"),
+                    ("gitnest version",     "v",   "Display version, OS, Rust, and path details"),
+                    ("gitnest export",      "ex",  "Export backup ZIP archive (config, keys)"),
+                    ("gitnest import <z>",  "im",  "Restore backup from ZIP archive"),
+                    ("gitnest status",      "s",   "Show rich system status and repo state"),
+                ];
+
+                for (cmd, alias, desc) in features {
+                    table.add_row(vec![
+                        Cell::new(cmd).fg(Color::White),
+                        Cell::new(alias).fg(Color::Yellow),
+                        Cell::new(desc).fg(Color::White),
+                    ]);
+                }
+                println!("\n{}\n", table);
+            }
+            _ => {
+                println!("\nGoodbye!");
+                break;
+            }
+        }
+        println!();
+    }
 }
