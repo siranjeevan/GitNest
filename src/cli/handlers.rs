@@ -597,10 +597,19 @@ async fn handle_create(
     println!("Repository created on GitHub: {}", ssh_url);
 
     let cwd = env::current_dir()?;
-    let project_dir = cwd.join(name);
-    if !project_dir.exists() {
-        std::fs::create_dir_all(&project_dir)?;
-    }
+    let is_already_repo = git_service.is_git_repository(&cwd).unwrap_or(false);
+    
+    // If name matches current directory name OR current directory is already a git repo / contains files, initialize inside cwd
+    let current_dir_name = cwd.file_name().and_then(|s| s.to_str()).unwrap_or("");
+    let project_dir = if is_already_repo || current_dir_name.to_lowercase() == name.to_lowercase() {
+        cwd.clone()
+    } else {
+        let sub_dir = cwd.join(name);
+        if !sub_dir.exists() {
+            std::fs::create_dir_all(&sub_dir)?;
+        }
+        sub_dir
+    };
 
     // Initialize local git repository if not already initialized
     if !git_service.is_git_repository(&project_dir)? {
