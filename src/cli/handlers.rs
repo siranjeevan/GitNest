@@ -425,6 +425,19 @@ fn handle_version(config_mgr: &ConfigManager) -> Result<()> {
     Ok(())
 }
 
+fn prompt_account_selection(accounts: &[Account]) -> Result<Account> {
+    println!("Select GitHub Account to clone with:");
+    for (idx, acc) in accounts.iter().enumerate() {
+        println!("  [{}] {} ({})", idx + 1, acc.github_username, acc.email);
+    }
+    print!("Enter choice [1-{}]: ", accounts.len());
+    io::stdout().flush().ok();
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    let choice: usize = input.trim().parse().unwrap_or(1);
+    Ok(accounts[choice - 1].clone())
+}
+
 async fn handle_clone(
     project_service: &ProjectService,
     account_service: &AccountService,
@@ -442,16 +455,18 @@ async fn handle_clone(
     let selected_acc = match account_opt {
         Some(t) => accounts.into_iter().find(|a| a.id == t || a.github_username == t).ok_or_else(|| GitNestError::AccountNotFound(t))?,
         None => {
-            println!("Select GitHub Account to clone with:");
-            for (idx, acc) in accounts.iter().enumerate() {
-                println!("  [{}] {} ({})", idx + 1, acc.github_username, acc.email);
+            // Check if current directory is already mapped to an account
+            let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+            if let Ok(Some(proj)) = project_service.find_project(&cwd).await {
+                if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
+                    println!("Using mapped account for current directory: {}", acc.github_username);
+                    acc
+                } else {
+                    prompt_account_selection(&accounts)?
+                }
+            } else {
+                prompt_account_selection(&accounts)?
             }
-            print!("Enter choice [1-{}]: ", accounts.len());
-            io::stdout().flush().ok();
-            let mut input = String::new();
-            io::stdin().read_line(&mut input)?;
-            let choice: usize = input.trim().parse().unwrap_or(1);
-            accounts[choice - 1].clone()
         }
     };
 
