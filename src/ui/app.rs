@@ -82,6 +82,49 @@ fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
     f.render_widget(p, popup_area);
 }
 
+fn render_remove_account_modal(f: &mut Frame, _state: &AppState, target_acc: &crate::domain::account::Account, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 4,
+        area.height / 3,
+        area.width / 2,
+        area.height / 3,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let text = vec![
+        Line::from(Span::styled("CONFIRM ACCOUNT REMOVAL", Theme::error_badge())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Target Identity: ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.github_username, Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("Email Address  : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.email, Style::default().fg(Theme::CYAN)),
+        ]),
+        Line::from(vec![
+            Span::styled("SSH Key ID     : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.key_id, Style::default().fg(Theme::VIOLET)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("⚠️ Action cannot be undone! Keyring credentials will be cleared.", Theme::error_badge()),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [Enter / d] Confirm Remove Account   [Esc] Cancel", Theme::error_badge()),
+        ]),
+    ];
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" REMOVE ACCOUNT CONFIRMATION ")
+            .borders(Borders::ALL)
+            .border_style(Theme::error_badge()),
+    );
+    f.render_widget(p, popup_area);
+}
+
 pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
@@ -119,6 +162,10 @@ pub fn render_app(f: &mut Frame, state: &AppState) {
 
     if let Some(ref target_acc) = state.modal_switch_account {
         render_switch_account_modal(f, state, target_acc, size);
+    }
+
+    if let Some(ref target_acc) = state.modal_remove_account {
+        render_remove_account_modal(f, state, target_acc, size);
     }
 }
 
@@ -343,7 +390,7 @@ fn render_accounts(f: &mut Frame, state: &AppState, area: Rect) {
 
     let list = List::new(items).block(
         Block::default()
-            .title(" REGISTERED GITHUB IDENTITIES ")
+            .title(" REGISTERED GITHUB IDENTITIES ([Enter] Switch Context │ [d / Delete] Remove Account) ")
             .borders(Borders::ALL)
             .border_style(Theme::border_active()),
     );

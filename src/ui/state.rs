@@ -27,6 +27,7 @@ pub struct AppState {
     pub global_git_user: Option<String>,
     pub global_git_email: Option<String>,
     pub modal_switch_account: Option<Account>,
+    pub modal_remove_account: Option<Account>,
     pub show_help_modal: bool,
     pub spinner_frame: usize,
     pub notification: Option<(String, bool)>, // (message, is_error)
@@ -48,6 +49,7 @@ impl AppState {
             global_git_user: None,
             global_git_email: None,
             modal_switch_account: None,
+            modal_remove_account: None,
             show_help_modal: false,
             spinner_frame: 0,
             notification: None,

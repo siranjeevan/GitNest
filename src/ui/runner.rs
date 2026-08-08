@@ -99,6 +99,35 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     continue;
                 }
 
+                if state.modal_remove_account.is_some() {
+                    match key.code {
+                        KeyCode::Esc => state.modal_remove_account = None,
+                        KeyCode::Enter | KeyCode::Char('d') => {
+                            if let Some(target) = state.modal_remove_account.take() {
+                                let username = target.github_username.clone();
+                                if let Err(e) = account_service.remove_account(&target.id).await {
+                                    state.set_notification(format!("Failed to remove account: {}", e), true);
+                                } else {
+                                    if let Ok(updated) = account_service.list_accounts().await {
+                                        state.accounts = updated;
+                                    }
+                                    if state.selected_account_index > 0 && state.selected_account_index >= state.accounts.len() {
+                                        state.selected_account_index = state.accounts.len().saturating_sub(1);
+                                    }
+                                    if let Some(ref active) = state.active_account {
+                                        if active.id == target.id {
+                                            state.active_account = None;
+                                        }
+                                    }
+                                    state.set_notification(format!("Account @{} removed successfully", username), false);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 // Global Shortcuts
                 if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
@@ -171,9 +200,24 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     Screen::Accounts => match key.code {
                         KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
                         KeyCode::Char('q') => break,
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            if !state.accounts.is_empty() && state.selected_account_index < state.accounts.len() - 1 {
+                                state.selected_account_index += 1;
+                            }
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            if state.selected_account_index > 0 {
+                                state.selected_account_index -= 1;
+                            }
+                        }
                         KeyCode::Enter => {
                             if let Some(acc) = state.accounts.get(state.selected_account_index) {
                                 state.modal_switch_account = Some(acc.clone());
+                            }
+                        }
+                        KeyCode::Char('d') | KeyCode::Delete => {
+                            if let Some(acc) = state.accounts.get(state.selected_account_index) {
+                                state.modal_remove_account = Some(acc.clone());
                             }
                         }
                         _ => {}
