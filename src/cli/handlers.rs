@@ -614,9 +614,19 @@ async fn handle_create(
     let cwd = env::current_dir()?;
     let is_already_repo = git_service.is_git_repository(&cwd).unwrap_or(false);
     
-    // If name matches current directory name OR current directory is already a git repo / contains files, initialize inside cwd
+    // Check if current directory has any files (other than hidden files)
+    let has_files = std::fs::read_dir(&cwd)
+        .map(|entries| {
+            entries.filter_map(|e| e.ok()).any(|entry| {
+                let file_name = entry.file_name();
+                let s = file_name.to_string_lossy();
+                !s.starts_with('.') && s != "target"
+            })
+        })
+        .unwrap_or(false);
+
     let current_dir_name = cwd.file_name().and_then(|s| s.to_str()).unwrap_or("");
-    let project_dir = if is_already_repo || current_dir_name.to_lowercase() == name.to_lowercase() {
+    let project_dir = if is_already_repo || has_files || current_dir_name.to_lowercase() == name.to_lowercase() {
         cwd.clone()
     } else {
         let sub_dir = cwd.join(name);
@@ -669,6 +679,27 @@ async fn handle_create(
         "Successfully created and mapped repository at {:?} to {}",
         project_dir, selected_acc.github_username
     );
+
+    // If folder contains existing files, auto-stage, auto-commit, and auto-push
+    if has_files {
+        println!("Existing files detected! Staging, committing, and pushing code to GitHub...");
+        let _ = std::process::Command::new("git")
+            .args(["add", "."])
+            .current_dir(&project_dir)
+            .output();
+
+        let commit_res = std::process::Command::new("git")
+            .args(["commit", "-m", "Initial commit from GitNest"])
+            .current_dir(&project_dir)
+            .output();
+
+        if commit_res.is_ok() {
+            let key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
+            let push_args = vec!["push", "-u", "origin", "master"];
+            let _ = git_service.execute_ephemeral(&project_dir, &selected_acc, &key_path, &push_args);
+            println!("Initial commit pushed successfully to GitHub!");
+        }
+    }
 
     Ok(())
 }
@@ -874,15 +905,17 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
                 let _ = handle_project_add(config_mgr, &project_service, &account_service, None, None).await;
             }
             Ok(Some(2)) => {
-                println!("\nEnter repository name to create:");
+                let cwd = std::env::current_dir().unwrap_or_default();
+                let default_name = cwd.file_name().and_then(|s| s.to_str()).unwrap_or("my-project");
+                println!("\nEnter repository name (Press ENTER for '{}'):", default_name);
                 let mut input = String::new();
                 std::io::stdin().read_line(&mut input).ok();
                 let name = input.trim();
-                if !name.is_empty() {
-                    let ssh_service = SshService::new(ssh_dir.clone());
-                    let git_service = GitService::new();
-                    let _ = handle_create(config_mgr, &project_service, &account_service, &ssh_service, &git_service, name, false, None).await;
-                }
+                let repo_name = if name.is_empty() { default_name } else { name };
+                
+                let ssh_service = SshService::new(ssh_dir.clone());
+                let git_service = GitService::new();
+                let _ = handle_create(config_mgr, &project_service, &account_service, &ssh_service, &git_service, repo_name, false, None).await;
             }
             Ok(Some(3)) => {
                 println!("\nEnter repository URL to clone (SSH or HTTPS):");
