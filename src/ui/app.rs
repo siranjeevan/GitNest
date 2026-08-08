@@ -125,6 +125,52 @@ fn render_remove_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
     f.render_widget(p, popup_area);
 }
 
+fn render_login_modal(f: &mut Frame, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 5,
+        area.height / 4,
+        (area.width * 3) / 5,
+        area.height / 2,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let text = vec![
+        Line::from(Span::styled("ADD NEW GITHUB ACCOUNT", Theme::title())),
+        Line::from(""),
+        Line::from("  GitNest uses secure GitHub Device OAuth Authentication."),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Step 1: ", Style::default().fg(Theme::CYAN)),
+            Span::styled("Press [Enter] to generate device code and open GitHub in browser", Style::default().fg(Theme::TEXT)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Step 2: ", Style::default().fg(Theme::CYAN)),
+            Span::styled("Paste code & authorize GitNest on github.com/login/device", Style::default().fg(Theme::TEXT)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Step 3: ", Style::default().fg(Theme::CYAN)),
+            Span::styled("GitNest automatically generates dedicated Ed25519 SSH keys & vaults tokens", Style::default().fg(Theme::TEXT)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  CLI Equivalent: ", Style::default().fg(Theme::MUTED)),
+            Span::styled("`gitnest auth login`", Style::default().fg(Theme::VIOLET)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [Enter] Start GitHub OAuth Login     [Esc] Cancel", Theme::success_badge()),
+        ]),
+    ];
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" GITHUB OAUTH DEVICE LOGIN ")
+            .borders(Borders::ALL)
+            .border_style(Theme::border_active()),
+    );
+    f.render_widget(p, popup_area);
+}
+
 pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
@@ -158,6 +204,10 @@ pub fn render_app(f: &mut Frame, state: &AppState) {
 
     if state.show_help_modal {
         render_help_modal(f, size);
+    }
+
+    if state.show_login_modal {
+        render_login_modal(f, size);
     }
 
     if let Some(ref target_acc) = state.modal_switch_account {

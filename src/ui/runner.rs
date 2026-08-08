@@ -128,6 +128,21 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     continue;
                 }
 
+                if state.show_login_modal {
+                    match key.code {
+                        KeyCode::Esc => state.show_login_modal = false,
+                        KeyCode::Enter => {
+                            state.show_login_modal = false;
+                            state.set_notification(
+                                "Run `gitnest auth login` in terminal to execute GitHub OAuth Device login",
+                                false,
+                            );
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 // Global Shortcuts
                 if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
@@ -183,7 +198,7 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             }
                         }
                         KeyCode::Enter => match state.menu_index {
-                            0 => state.current_screen = Screen::Accounts,
+                            0 => state.show_login_modal = true,
                             1 => state.current_screen = Screen::Projects,
                             2 => state.current_screen = Screen::CreateRepo,
                             3 => state.current_screen = Screen::CloneRepo,
@@ -248,7 +263,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             state.command_palette_query.clear();
                             state.command_palette_index = 0;
                             match idx {
-                                0 => state.current_screen = Screen::Accounts,
+                                0 => {
+                                    state.current_screen = Screen::Dashboard;
+                                    state.show_login_modal = true;
+                                }
                                 1 => state.current_screen = Screen::Projects,
                                 2 => state.current_screen = Screen::CreateRepo,
                                 3 => state.current_screen = Screen::CloneRepo,

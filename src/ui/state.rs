@@ -29,6 +29,7 @@ pub struct AppState {
     pub modal_switch_account: Option<Account>,
     pub modal_remove_account: Option<Account>,
     pub show_help_modal: bool,
+    pub show_login_modal: bool,
     pub spinner_frame: usize,
     pub notification: Option<(String, bool)>, // (message, is_error)
     pub should_quit: bool,
@@ -51,6 +52,7 @@ impl AppState {
             modal_switch_account: None,
             modal_remove_account: None,
             show_help_modal: false,
+            show_login_modal: false,
             spinner_frame: 0,
             notification: None,
             should_quit: false,
