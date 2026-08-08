@@ -375,7 +375,7 @@ fn render_settings(f: &mut Frame, _state: &AppState, area: Rect) {
     f.render_widget(p, area);
 }
 
-fn render_command_palette(f: &mut Frame, _state: &AppState, area: Rect) {
+fn render_command_palette(f: &mut Frame, state: &AppState, area: Rect) {
     let popup_area = Rect::new(
         area.width / 6,
         area.height / 4,
@@ -384,16 +384,34 @@ fn render_command_palette(f: &mut Frame, _state: &AppState, area: Rect) {
     );
     f.render_widget(Clear, popup_area);
 
-    let items = vec![
-        ListItem::new("Login to GitHub Account"),
-        ListItem::new("Connect Folder to Account"),
-        ListItem::new("Create New Repository"),
-        ListItem::new("Clone Repository"),
-        ListItem::new("Manage Accounts & Keys"),
-        ListItem::new("View Connected Projects"),
-        ListItem::new("Identity Security Panel"),
-        ListItem::new("Run System Health Doctor"),
+    let raw_items = [
+        "Login / Add GitHub Account",
+        "Connect Folder to Account",
+        "Create New Repository",
+        "Clone Repository",
+        "Manage Accounts & Keys",
+        "View Connected Projects",
+        "Identity Security Panel",
+        "Run System Health Doctor",
     ];
+
+    let items: Vec<ListItem> = raw_items
+        .iter()
+        .enumerate()
+        .map(|(idx, item)| {
+            let style = if idx == state.command_palette_index {
+                Theme::active_item()
+            } else {
+                Theme::inactive_item()
+            };
+            let prefix = if idx == state.command_palette_index {
+                "❯ "
+            } else {
+                "  "
+            };
+            ListItem::new(format!("{}{}", prefix, item)).style(style)
+        })
+        .collect();
 
     let list = List::new(items).block(
         Block::default()

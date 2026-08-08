@@ -116,6 +116,31 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     Screen::CommandPalette => match key.code {
                         KeyCode::Esc => state.current_screen = Screen::Dashboard,
                         KeyCode::Char('q') => break,
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            if state.command_palette_index < 7 {
+                                state.command_palette_index += 1;
+                            }
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            if state.command_palette_index > 0 {
+                                state.command_palette_index -= 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            let idx = state.command_palette_index;
+                            state.command_palette_index = 0;
+                            match idx {
+                                0 => state.current_screen = Screen::Accounts,
+                                1 => state.current_screen = Screen::Projects,
+                                2 => state.current_screen = Screen::CreateRepo,
+                                3 => state.current_screen = Screen::CloneRepo,
+                                4 => state.current_screen = Screen::Accounts,
+                                5 => state.current_screen = Screen::Projects,
+                                6 => state.current_screen = Screen::Security,
+                                7 => state.current_screen = Screen::Doctor,
+                                _ => state.current_screen = Screen::Dashboard,
+                            }
+                        }
                         _ => {}
                     },
                     _ => match key.code {
