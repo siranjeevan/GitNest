@@ -5,7 +5,7 @@ const path = require('path');
 const https = require('https');
 const { execSync } = require('child_process');
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 const REPO = 'siranjeevan/GitNest';
 
 const platform = process.platform;
@@ -52,8 +52,7 @@ function download(url, dest, cb) {
     }
     if (response.statusCode !== 200) {
       fs.unlinkSync(dest);
-      console.error(`[gitnest] Download failed with HTTP status ${response.statusCode}`);
-      process.exit(1);
+      return cb(new Error(`HTTP ${response.statusCode}`));
     }
     response.pipe(file);
     file.on('finish', () => {
@@ -66,23 +65,9 @@ function download(url, dest, cb) {
   });
 }
 
-download(downloadUrl, targetFile, () => {
-  console.log(`[gitnest] Extracting binary...`);
-  try {
-    if (artifactName.endsWith('.tar.gz')) {
-      execSync(`tar -xzf "${targetFile}" -C "${binDir}"`);
-    } else if (artifactName.endsWith('.zip')) {
-      execSync(`powershell -Command "Expand-Archive -Path '${targetFile}' -DestinationPath '${binDir}' -Force"`);
-    }
-    fs.unlinkSync(targetFile);
-
-    const binaryName = platform === 'win32' ? 'gitnest.exe' : 'gitnest';
-    const binaryPath = path.join(binDir, binaryName);
-    if (platform !== 'win32') {
-      fs.chmodSync(binaryPath, 0o755);
-    }
-  } catch (e) {
-    console.log(`[gitnest] GitHub Releases download fallback: Compiling from source...`);
+download(downloadUrl, targetFile, (err) => {
+  if (err) {
+    console.log(`[gitnest] Pre-built release download unavailable (${err.message}). Fallback: Compiling from source...`);
     try {
       execSync(`cargo build --release`, { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
       const srcBin = platform === 'win32'
@@ -97,8 +82,29 @@ download(downloadUrl, targetFile, () => {
       }
       console.log(`[gitnest] Source build & installation successful!`);
     } catch (buildErr) {
-      console.error(`[gitnest] Extraction and build failed: ${e.message}`);
+      console.error(`[gitnest] Build failed: ${buildErr.message}`);
       process.exit(1);
     }
+    return;
+  }
+
+  console.log(`[gitnest] Extracting binary...`);
+  try {
+    if (artifactName.endsWith('.tar.gz')) {
+      execSync(`tar -xzf "${targetFile}" -C "${binDir}"`);
+    } else if (artifactName.endsWith('.zip')) {
+      execSync(`powershell -Command "Expand-Archive -Path '${targetFile}' -DestinationPath '${binDir}' -Force"`);
+    }
+    fs.unlinkSync(targetFile);
+
+    const binaryName = platform === 'win32' ? 'gitnest.exe' : 'gitnest';
+    const binaryPath = path.join(binDir, binaryName);
+    if (platform !== 'win32') {
+      fs.chmodSync(binaryPath, 0o755);
+    }
+    console.log(`[gitnest] Installation successful!`);
+  } catch (e) {
+    console.error(`[gitnest] Extraction failed: ${e.message}`);
+    process.exit(1);
   }
 });

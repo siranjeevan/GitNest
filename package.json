@@ -1,6 +1,6 @@
 {
   "name": "@siranjeevan/gitnest",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "One Workspace. Multiple Git Identities.",
   "main": "bin/gitnest.js",
   "bin": {
