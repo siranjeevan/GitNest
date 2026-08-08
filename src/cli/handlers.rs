@@ -644,10 +644,20 @@ async fn handle_create(
             .output();
     }
 
-    let _ = std::process::Command::new("git")
-        .args(["remote", "add", "origin", &ssh_url])
+    // Update or add remote origin
+    let remote_set = std::process::Command::new("git")
+        .args(["remote", "set-url", "origin", &ssh_url])
         .current_dir(&project_dir)
         .output();
+
+    if let Ok(ref out) = remote_set {
+        if !out.status.success() {
+            let _ = std::process::Command::new("git")
+                .args(["remote", "add", "origin", &ssh_url])
+                .current_dir(&project_dir)
+                .output();
+        }
+    }
 
     let ssh_key_path = config_mgr.ssh_dir().join(&selected_acc.key_id);
     let _ = std::process::Command::new("git")
@@ -683,20 +693,28 @@ async fn handle_create(
     // If folder contains existing files, auto-stage, auto-commit, and auto-push
     if has_files {
         println!("Existing files detected! Staging, committing, and pushing code to GitHub...");
+        // Stage all files
         let _ = std::process::Command::new("git")
             .args(["add", "."])
             .current_dir(&project_dir)
             .output();
 
-        let commit_res = std::process::Command::new("git")
+        // Create commit if there are staged changes
+        let _ = std::process::Command::new("git")
             .args(["commit", "-m", "Initial commit from GitNest"])
             .current_dir(&project_dir)
             .output();
 
-        if commit_res.is_ok() {
-            let key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
-            let push_args = vec!["push", "-u", "origin", "master"];
-            let _ = git_service.execute_ephemeral(&project_dir, &selected_acc, &key_path, &push_args);
+        // Ensure default branch is named 'main'
+        let _ = std::process::Command::new("git")
+            .args(["branch", "-M", "main"])
+            .current_dir(&project_dir)
+            .output();
+
+        let key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
+        let push_args = vec!["push", "-u", "origin", "main"];
+        let code = git_service.execute_ephemeral(&project_dir, &selected_acc, &key_path, &push_args)?;
+        if code == 0 {
             println!("Initial commit pushed successfully to GitHub!");
         }
     }
