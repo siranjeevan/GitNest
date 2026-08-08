@@ -5,7 +5,7 @@ const path = require('path');
 const https = require('https');
 const { execSync } = require('child_process');
 
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 const REPO = 'siranjeevan/GitNest';
 
 const platform = process.platform;
@@ -81,9 +81,24 @@ download(downloadUrl, targetFile, () => {
     if (platform !== 'win32') {
       fs.chmodSync(binaryPath, 0o755);
     }
-    console.log(`[gitnest] Installation successful!`);
   } catch (e) {
-    console.error(`[gitnest] Extraction failed: ${e.message}`);
-    process.exit(1);
+    console.log(`[gitnest] GitHub Releases download fallback: Compiling from source...`);
+    try {
+      execSync(`cargo build --release`, { cwd: path.join(__dirname, '..'), stdio: 'inherit' });
+      const srcBin = platform === 'win32'
+        ? path.join(__dirname, '..', 'target', 'release', 'gitnest.exe')
+        : path.join(__dirname, '..', 'target', 'release', 'gitnest');
+      const targetBin = platform === 'win32'
+        ? path.join(binDir, 'gitnest.exe')
+        : path.join(binDir, 'gitnest');
+      fs.copyFileSync(srcBin, targetBin);
+      if (platform !== 'win32') {
+        fs.chmodSync(targetBin, 0o755);
+      }
+      console.log(`[gitnest] Source build & installation successful!`);
+    } catch (buildErr) {
+      console.error(`[gitnest] Extraction and build failed: ${e.message}`);
+      process.exit(1);
+    }
   }
 });
