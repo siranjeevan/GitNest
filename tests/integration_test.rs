@@ -1,10 +1,7 @@
 use gitnest::config::ConfigManager;
 use gitnest::domain::account::Account;
-use gitnest::domain::project::Project;
 use gitnest::services::{AccountService, ProjectService, SshService};
-use gitnest::storage::{
-    AccountRepository, JsonAccountRepository, JsonProjectRepository, ProjectRepository,
-};
+use gitnest::storage::{JsonAccountRepository, JsonProjectRepository};
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::sync::Mutex;

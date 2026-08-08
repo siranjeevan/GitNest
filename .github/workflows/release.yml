@@ -25,10 +25,11 @@ jobs:
 
       - name: Validate Version against Cargo.toml
         run: |
-          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | cut -d '"' -f 2)
-          echo "Cargo Version: $CARGO_VERSION"
+          CARGO_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1 | tr -d ' ')
+          echo "Cargo Version: '$CARGO_VERSION'"
+          echo "Tag Version: '$VERSION'"
           if [ "$VERSION" != "$CARGO_VERSION" ]; then
-            echo "ERROR: Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)!"
+            echo "ERROR: Tag version ('$VERSION') does not match Cargo.toml version ('$CARGO_VERSION')!"
             exit 1
           fi
 
