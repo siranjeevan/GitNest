@@ -1,0 +1,6 @@
+# Ignore Rust target build directory
+target/
+*.tar.gz
+*.zip
+*.tgz
+.env

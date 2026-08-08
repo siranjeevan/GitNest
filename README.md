@@ -106,12 +106,21 @@ OAuth access tokens are never saved to disk in plain text. They are stored secur
 
 ## Installation
 
-### Option 1: Quick Install Script (macOS & Linux)
+### Option 1: npm / npx (Global & Instant)
+```bash
+# Global install via npm
+npm install -g gitnest
+
+# Or run instantly via npx without installing
+npx gitnest
+```
+
+### Option 2: Quick Install Script (macOS & Linux)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/siranjeevan/GitNest/main/install.sh | bash
 ```
 
-### Option 2: Homebrew (macOS & Linux)
+### Option 3: Homebrew (macOS & Linux)
 ```bash
 brew install siranjeevan/tap/gitnest
 ```

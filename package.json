@@ -1,0 +1,30 @@
+{
+  "name": "gitnest",
+  "version": "1.0.0",
+  "description": "One Workspace. Multiple Git Identities.",
+  "main": "bin/gitnest.js",
+  "bin": {
+    "gitnest": "bin/gitnest.js"
+  },
+  "scripts": {
+    "postinstall": "node bin/install.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/siranjeevan/GitNest.git"
+  },
+  "keywords": [
+    "git",
+    "ssh",
+    "identity",
+    "cli",
+    "tui",
+    "github"
+  ],
+  "author": "GitNest Team <smartjeevith2k@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/siranjeevan/GitNest/issues"
+  },
+  "homepage": "https://github.com/siranjeevan/GitNest#readme"
+}
