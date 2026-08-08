@@ -69,10 +69,36 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
 
     // 3. Event Handling Loop
     loop {
+        state.spinner_frame = state.spinner_frame.wrapping_add(1);
         terminal.draw(|f| render_app(f, &state))?;
 
         if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
+                // Modal Active Intercepts
+                if state.show_help_modal {
+                    if key.code == KeyCode::Esc || key.code == KeyCode::Char('?') {
+                        state.show_help_modal = false;
+                    }
+                    continue;
+                }
+
+                if state.modal_switch_account.is_some() {
+                    match key.code {
+                        KeyCode::Esc => state.modal_switch_account = None,
+                        KeyCode::Enter => {
+                            if let Some(target) = state.modal_switch_account.take() {
+                                state.active_account = Some(target.clone());
+                                state.set_notification(
+                                    format!("Switched identity context to {}", target.github_username),
+                                    false,
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 // Global Shortcuts
                 if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
@@ -81,8 +107,37 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
 
                 if key.code == KeyCode::Char('k') && key.modifiers.contains(KeyModifiers::CONTROL)
                 {
+                    state.command_palette_query.clear();
+                    state.command_palette_index = 0;
                     state.current_screen = Screen::CommandPalette;
                     continue;
+                }
+
+                // Direct Single-Key Jump Shortcuts
+                if state.current_screen != Screen::CommandPalette {
+                    match key.code {
+                        KeyCode::Char('?') => {
+                            state.show_help_modal = true;
+                            continue;
+                        }
+                        KeyCode::Char('a') => {
+                            state.current_screen = Screen::Accounts;
+                            continue;
+                        }
+                        KeyCode::Char('p') => {
+                            state.current_screen = Screen::Projects;
+                            continue;
+                        }
+                        KeyCode::Char('s') => {
+                            state.current_screen = Screen::Security;
+                            continue;
+                        }
+                        KeyCode::Char('d') => {
+                            state.current_screen = Screen::Doctor;
+                            continue;
+                        }
+                        _ => {}
+                    }
                 }
 
                 match state.current_screen {
@@ -113,21 +168,40 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         },
                         _ => {}
                     },
+                    Screen::Accounts => match key.code {
+                        KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
+                        KeyCode::Char('q') => break,
+                        KeyCode::Enter => {
+                            if let Some(acc) = state.accounts.get(state.selected_account_index) {
+                                state.modal_switch_account = Some(acc.clone());
+                            }
+                        }
+                        _ => {}
+                    },
                     Screen::CommandPalette => match key.code {
                         KeyCode::Esc => state.current_screen = Screen::Dashboard,
-                        KeyCode::Char('q') => break,
-                        KeyCode::Down | KeyCode::Char('j') => {
+                        KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => break,
+                        KeyCode::Backspace => {
+                            state.command_palette_query.pop();
+                            state.command_palette_index = 0;
+                        }
+                        KeyCode::Char(c) => {
+                            state.command_palette_query.push(c);
+                            state.command_palette_index = 0;
+                        }
+                        KeyCode::Down => {
                             if state.command_palette_index < 7 {
                                 state.command_palette_index += 1;
                             }
                         }
-                        KeyCode::Up | KeyCode::Char('k') => {
+                        KeyCode::Up => {
                             if state.command_palette_index > 0 {
                                 state.command_palette_index -= 1;
                             }
                         }
                         KeyCode::Enter => {
                             let idx = state.command_palette_index;
+                            state.command_palette_query.clear();
                             state.command_palette_index = 0;
                             match idx {
                                 0 => state.current_screen = Screen::Accounts,

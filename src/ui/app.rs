@@ -8,6 +8,80 @@ use ratatui::{
     Frame,
 };
 
+fn render_help_modal(f: &mut Frame, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 5,
+        area.height / 4,
+        (area.width * 3) / 5,
+        area.height / 2,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let text = vec![
+        Line::from(Span::styled("KEYBOARD SHORTCUTS CHEAT SHEET", Theme::title())),
+        Line::from(""),
+        Line::from("  ↑ / ↓ or j / k  : Navigate menu items"),
+        Line::from("  Enter           : Select item or confirm modal"),
+        Line::from("  Ctrl + K        : Open Command Palette with Fuzzy Search"),
+        Line::from("  a               : Jump to Accounts View"),
+        Line::from("  p               : Jump to Projects View"),
+        Line::from("  s               : Jump to Security Center"),
+        Line::from("  d               : Jump to Doctor Diagnostics"),
+        Line::from("  Esc or b        : Return to Dashboard"),
+        Line::from("  ?               : Toggle this Help Overlay"),
+        Line::from("  q or Ctrl + C   : Quit GitNest cleanly"),
+        Line::from(""),
+        Line::from(Span::styled("  Press [Esc] or [?] to close.", Style::default().fg(Theme::CYAN))),
+    ];
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" HELP & NAVIGATION GUIDE ")
+            .borders(Borders::ALL)
+            .border_style(Theme::border_active()),
+    );
+    f.render_widget(p, popup_area);
+}
+
+fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &crate::domain::account::Account, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 4,
+        area.height / 3,
+        area.width / 2,
+        area.height / 3,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let text = vec![
+        Line::from(Span::styled("CONFIRM IDENTITY SWITCH", Theme::title())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("Target Identity: ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.github_username, Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(vec![
+            Span::styled("Email Address  : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.email, Style::default().fg(Theme::CYAN)),
+        ]),
+        Line::from(vec![
+            Span::styled("SSH Key ID     : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&target_acc.key_id, Style::default().fg(Theme::VIOLET)),
+        ]),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [Enter] Confirm & Update .git/config   [Esc] Cancel", Theme::warning_badge()),
+        ]),
+    ];
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" ACCOUNT SWITCH MODAL ")
+            .borders(Borders::ALL)
+            .border_style(Theme::border_active()),
+    );
+    f.render_widget(p, popup_area);
+}
+
 pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
@@ -38,6 +112,14 @@ pub fn render_app(f: &mut Frame, state: &AppState) {
     }
 
     render_footer(f, state, chunks[2]);
+
+    if state.show_help_modal {
+        render_help_modal(f, size);
+    }
+
+    if let Some(ref target_acc) = state.modal_switch_account {
+        render_switch_account_modal(f, state, target_acc, size);
+    }
 }
 
 fn render_header(f: &mut Frame, area: Rect) {
@@ -395,7 +477,14 @@ fn render_command_palette(f: &mut Frame, state: &AppState, area: Rect) {
         "Run System Health Doctor",
     ];
 
-    let items: Vec<ListItem> = raw_items
+    let query_lower = state.command_palette_query.to_lowercase();
+    let filtered_items: Vec<&str> = raw_items
+        .iter()
+        .filter(|item| item.to_lowercase().contains(&query_lower))
+        .copied()
+        .collect();
+
+    let items: Vec<ListItem> = filtered_items
         .iter()
         .enumerate()
         .map(|(idx, item)| {
@@ -413,9 +502,15 @@ fn render_command_palette(f: &mut Frame, state: &AppState, area: Rect) {
         })
         .collect();
 
+    let title_text = if state.command_palette_query.is_empty() {
+        " COMMAND PALETTE (Type to search...) ".to_string()
+    } else {
+        format!(" COMMAND PALETTE (Filter: '{}') ", state.command_palette_query)
+    };
+
     let list = List::new(items).block(
         Block::default()
-            .title(" COMMAND PALETTE (Ctrl+K) ")
+            .title(title_text)
             .borders(Borders::ALL)
             .border_style(Theme::border_active()),
     );
@@ -423,19 +518,26 @@ fn render_command_palette(f: &mut Frame, state: &AppState, area: Rect) {
 }
 
 fn render_footer(f: &mut Frame, state: &AppState, area: Rect) {
+    let spinner_frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+    let spinner = spinner_frames[state.spinner_frame % spinner_frames.len()];
+
     let footer_text = if let Some((ref msg, is_err)) = state.notification {
         let style = if is_err {
             Theme::error_badge()
         } else {
             Theme::success_badge()
         };
-        Line::from(vec![Span::styled(format!("  Notice: {}", msg), style)])
+        Line::from(vec![Span::styled(format!("  {} Notice: {}", spinner, msg), style)])
     } else {
         Line::from(vec![
-            Span::styled("  ↑↓ Navigate  ", Theme::footer_help()),
-            Span::styled("Enter Select  ", Theme::footer_help()),
-            Span::styled("Ctrl+K Palette  ", Theme::footer_help()),
-            Span::styled("Esc Back  ", Theme::footer_help()),
+            Span::styled(format!("  {} ", spinner), Style::default().fg(Theme::CYAN)),
+            Span::styled("↑↓ Nav ", Theme::footer_help()),
+            Span::styled("Enter Select ", Theme::footer_help()),
+            Span::styled("Ctrl+K Palette ", Theme::footer_help()),
+            Span::styled("a Acc ", Theme::footer_help()),
+            Span::styled("s Sec ", Theme::footer_help()),
+            Span::styled("d Doc ", Theme::footer_help()),
+            Span::styled("? Help ", Theme::footer_help()),
             Span::styled("q Quit", Theme::footer_help()),
         ])
     };
