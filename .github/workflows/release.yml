@@ -1,0 +1,162 @@
+name: GitNest Automated GitHub Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-test:
+    name: Validate Version & Run Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Extract Tag Version
+        id: get_version
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$TAG_NAME" >> $GITHUB_ENV
+          echo "Extracted Tag Version: $TAG_NAME"
+
+      - name: Validate Version against Cargo.toml
+        run: |
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | cut -d '"' -f 2)
+          echo "Cargo Version: $CARGO_VERSION"
+          if [ "$VERSION" != "$CARGO_VERSION" ]; then
+            echo "ERROR: Tag version ($VERSION) does not match Cargo.toml version ($CARGO_VERSION)!"
+            exit 1
+          fi
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Verify Formatting
+        run: cargo fmt --check
+
+      - name: Cargo Check
+        run: cargo check --all-targets
+
+      - name: Cargo Clippy Lints
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Run Full Test & Security Suite
+        run: cargo test --all-targets
+
+  build-release-matrix:
+    name: Build Release Binary (${{ matrix.target }})
+    needs: validate-and-test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: gitnest-v1.0.0-macos-arm64.tar.gz
+            asset_name: gitnest
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: gitnest-v1.0.0-macos-x86_64.tar.gz
+            asset_name: gitnest
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: gitnest-v1.0.0-linux-x86_64.tar.gz
+            asset_name: gitnest
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: gitnest-v1.0.0-windows-x86_64.zip
+            asset_name: gitnest.exe
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build Release Binary
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Smoke Test Binary (Host Target)
+        if: matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target == 'aarch64-apple-darwin'
+        run: |
+          ./target/${{ matrix.target }}/release/${{ matrix.asset_name }} --version
+          ./target/${{ matrix.target }}/release/${{ matrix.asset_name }} --help
+
+      - name: Package Artifact (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czvf ../../../${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+          cd ../../../
+
+      - name: Package Artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "target/${{ matrix.target }}/release/${{ matrix.asset_name }}" -DestinationPath "${{ matrix.artifact_name }}"
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  publish-github-release:
+    name: Generate Checksums & Create GitHub Release
+    needs: build-release-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS Manifest
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+          cd ..
+
+      - name: Create Automated GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: GitNest ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            # ◈ GitNest ${{ github.ref_name }}
+            
+            **One Workspace. Multiple Git Identities.**
+            
+            Production release of GitNest, a Rust-based CLI/TUI for managing multiple GitHub identities on a single workstation with fail-closed identity isolation.
+            
+            ## Key Highlights
+            - **Strict Identity Isolation**: 4-way alignment validation (`Account == Remote == Git == SSH Key Fingerprint`).
+            - **Dedicated SSH Isolation**: Scoped Ed25519 SSH keys with `-o IdentitiesOnly=yes`.
+            - **SSH Key Content Swap Guard**: SHA-256 fingerprint verification catching key substitutions.
+            - **Environment Override Protection**: `EnvGuard` blocking unsafe `GIT_SSH_COMMAND` overrides.
+            - **OS Credential Storage**: Native vaulting via macOS Keychain, Linux Secret Service, and Windows Credential Manager.
+            - **Atomic Storage**: Corruption-resistant JSON configuration writes using `tempfile` + `fsync`.
+            - **Developer-First TUI**: Interactive Ratatui interface with accounts view, security center, doctor, and `Ctrl+K` command palette.
+            - **Cross-Platform**: Support for macOS, Linux, and Windows.
+            
+            ## Checksums
+            Verify SHA-256 hashes against `SHA256SUMS` asset attached below.
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
