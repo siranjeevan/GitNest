@@ -106,24 +106,33 @@ OAuth access tokens are never saved to disk in plain text. They are stored secur
 
 ## Installation
 
-Download pre-compiled release binaries from [GitHub Releases](https://github.com/siranjeevan/GitNest/releases).
-
-### macOS
+### Option 1: Quick Install Script (macOS & Linux)
 ```bash
-# Download macOS ARM64 / x86_64 binary from releases
+curl -fsSL https://raw.githubusercontent.com/siranjeevan/GitNest/main/install.sh | bash
+```
+
+### Option 2: Homebrew (macOS & Linux)
+```bash
+brew install siranjeevan/tap/gitnest
+```
+
+### Option 3: Manual GitHub Releases Download
+Download pre-compiled release binaries directly from [GitHub Releases](https://github.com/siranjeevan/GitNest/releases).
+
+#### macOS
+```bash
 chmod +x gitnest
 mv gitnest /usr/local/bin/
 ```
 
-### Linux
+#### Linux
 ```bash
-# Download Linux x86_64 binary from releases
 chmod +x gitnest
 mv gitnest /usr/local/bin/
 ```
 
-### Windows
-Download the `gitnest-windows-x86_64.exe` executable and add it to your System `PATH`.
+#### Windows
+Download `gitnest-windows-x86_64.zip`, extract `gitnest.exe`, and add it to your System `PATH`.
 
 ---
 
