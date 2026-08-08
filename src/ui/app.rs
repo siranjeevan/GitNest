@@ -286,25 +286,17 @@ fn render_login_modal(f: &mut Frame, state: &AppState, area: Rect) {
 
 fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
     let popup_area = Rect::new(
-        area.width / 5,
-        area.height / 4,
-        (area.width * 3) / 5,
-        area.height / 2,
+        area.width / 6,
+        area.height / 5,
+        (area.width * 2) / 3,
+        (area.height * 3) / 5,
     );
     f.render_widget(Clear, popup_area);
 
     let cwd = std::env::current_dir().unwrap_or_default();
     let folder_name = cwd.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "project".to_string());
 
-    let (acc_name, acc_email) = if let Some(ref acc) = state.active_account {
-        (acc.github_username.as_str(), acc.email.as_str())
-    } else if let Some(acc) = state.accounts.first() {
-        (acc.github_username.as_str(), acc.email.as_str())
-    } else {
-        ("No Account", "Login required")
-    };
-
-    let text = vec![
+    let mut text = vec![
         Line::from(Span::styled("CONNECT FOLDER TO GITHUB ACCOUNT", Theme::title())),
         Line::from(""),
         Line::from(vec![
@@ -315,22 +307,41 @@ fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
             Span::styled("  Repository Name: ", Style::default().fg(Theme::MUTED)),
             Span::styled(&folder_name, Style::default().fg(Theme::TEXT)),
         ]),
-        Line::from(vec![
-            Span::styled("  Bind Identity  : ", Style::default().fg(Theme::MUTED)),
-            Span::styled(format!("@{} ({})", acc_name, acc_email), Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD)),
-        ]),
         Line::from(""),
-        Line::from("  This will map local git identity and SSH key pair exclusively"),
-        Line::from("  to this repository directory without affecting global git config."),
+        Line::from(Span::styled("  Select GitHub Identity to Bind: (↑/↓ to switch)", Style::default().fg(Theme::MUTED))),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  [Enter] Confirm & Connect Folder     [Esc] Cancel", Theme::success_badge()),
-        ]),
     ];
+
+    if state.accounts.is_empty() {
+        text.push(Line::from(Span::styled("  No registered accounts. Press 'a' or login first.", Theme::warning_badge())));
+    } else {
+        for (idx, acc) in state.accounts.iter().enumerate() {
+            let is_selected = idx == state.selected_connect_account_index;
+            let prefix = if is_selected { "  ❯ ● " } else { "    ○ " };
+            let style = if is_selected {
+                Theme::active_item()
+            } else {
+                Theme::inactive_item()
+            };
+            text.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(
+                    format!("@{} ", acc.github_username),
+                    if is_selected { Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD) } else { Style::default().fg(Theme::TEXT) },
+                ),
+                Span::styled(format!("({})", acc.email), Style::default().fg(Theme::MUTED)),
+            ]));
+        }
+    }
+
+    text.push(Line::from(""));
+    text.push(Line::from(vec![
+        Span::styled("  [Enter] Connect Selected Account     [↑/↓] Change Account     [Esc] Cancel", Theme::success_badge()),
+    ]));
 
     let p = Paragraph::new(text).block(
         Block::default()
-            .title(" CONNECT FOLDER CONFIRMATION ")
+            .title(" CONNECT FOLDER TO ACCOUNT ")
             .borders(Borders::ALL)
             .border_style(Theme::border_active()),
     );

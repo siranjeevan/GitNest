@@ -140,10 +140,20 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                 if state.show_connect_modal {
                     match key.code {
                         KeyCode::Esc => state.show_connect_modal = false,
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            if !state.accounts.is_empty() && state.selected_connect_account_index < state.accounts.len() - 1 {
+                                state.selected_connect_account_index += 1;
+                            }
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            if state.selected_connect_account_index > 0 {
+                                state.selected_connect_account_index -= 1;
+                            }
+                        }
                         KeyCode::Enter => {
                             state.show_connect_modal = false;
                             let cwd = env::current_dir().unwrap_or_default();
-                            let target_account = state.active_account.clone().or_else(|| state.accounts.first().cloned());
+                            let target_account = state.accounts.get(state.selected_connect_account_index).cloned().or_else(|| state.active_account.clone());
                             if let Some(acc) = target_account {
                                 state.active_account = Some(acc.clone());
                                 if let Ok(proj) = project_service.map_project(&cwd, &acc.id).await {
@@ -367,7 +377,15 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         }
                         KeyCode::Enter => match state.menu_index {
                             0 => state.show_login_modal = true,
-                            1 => state.show_connect_modal = true,
+                            1 => {
+                                state.selected_connect_account_index = 0;
+                                if let Some(ref active) = state.active_account {
+                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                        state.selected_connect_account_index = pos;
+                                    }
+                                }
+                                state.show_connect_modal = true;
+                            },
                             2 => state.current_screen = Screen::CreateRepo,
                             3 => state.current_screen = Screen::CloneRepo,
                             4 => state.current_screen = Screen::Accounts,
