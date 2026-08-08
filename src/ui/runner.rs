@@ -215,9 +215,15 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                             let ssh_service = SshService::new(config_mgr.ssh_dir());
                                             let key_path = ssh_service.resolve_key_path(&acc.key_id);
 
-                                            // 1. Initialize git repo if not already initialized
+                                            // 1. Initialize git repo with 'main' as default branch
                                             let _ = std::process::Command::new("git")
-                                                .args(["init"])
+                                                .args(["init", "-b", "main"])
+                                                .current_dir(&cwd)
+                                                .output();
+
+                                            // Ensure branch is named 'main' even if initialized previously as 'master'
+                                            let _ = std::process::Command::new("git")
+                                                .args(["branch", "-M", "main"])
                                                 .current_dir(&cwd)
                                                 .output();
 
@@ -239,7 +245,7 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                 }
                                             }
 
-                                            // 4. If there are files, auto-commit & push
+                                            // 4. Auto-commit & push to 'main' branch
                                             let git_service = crate::services::GitService::new();
                                             let _ = std::process::Command::new("git")
                                                 .args(["add", "."])
@@ -255,7 +261,7 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                 &cwd,
                                                 &acc,
                                                 &key_path,
-                                                &["push", "-u", "origin", "HEAD"],
+                                                &["push", "-u", "origin", "main"],
                                             );
 
                                             state.set_notification(
