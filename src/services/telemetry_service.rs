@@ -4,14 +4,14 @@ use serde_json::json;
 use sha2::Digest;
 use std::env;
 
-fn firebase_api_key() -> String {
-    env::var("FIREBASE_API_KEY")
-        .unwrap_or_else(|_| "AIzaSyCjr1M0DW9TPwrKv_-LaGwq3Vvk5Ja0JJ4".to_string())
+fn firebase_api_key() -> Option<String> {
+    let _ = dotenvy::dotenv();
+    env::var("FIREBASE_API_KEY").ok()
 }
 
-fn firebase_project_id() -> String {
-    env::var("FIREBASE_PROJECT_ID")
-        .unwrap_or_else(|_| "projects-495f4".to_string())
+fn firebase_project_id() -> Option<String> {
+    let _ = dotenvy::dotenv();
+    env::var("FIREBASE_PROJECT_ID").ok()
 }
 
 #[derive(Clone)]
@@ -32,8 +32,14 @@ impl TelemetryService {
             return;
         }
 
-        let api_key = firebase_api_key();
-        let project_id = firebase_project_id();
+        let api_key = match firebase_api_key() {
+            Some(key) => key,
+            None => return,
+        };
+        let project_id = match firebase_project_id() {
+            Some(pid) => pid,
+            None => return,
+        };
 
         let os = env::consts::OS.to_string();
         let arch = env::consts::ARCH.to_string();
@@ -72,8 +78,14 @@ impl TelemetryService {
 
     /// Store user profile in Firestore `users/{username}` collection
     pub async fn store_user_profile(&self, username: &str, email: &str) {
-        let api_key = firebase_api_key();
-        let project_id = firebase_project_id();
+        let api_key = match firebase_api_key() {
+            Some(key) => key,
+            None => return,
+        };
+        let project_id = match firebase_project_id() {
+            Some(pid) => pid,
+            None => return,
+        };
 
         let os = env::consts::OS.to_string();
         let arch = env::consts::ARCH.to_string();
