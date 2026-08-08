@@ -112,7 +112,11 @@ impl TelemetryService {
         });
 
         // Fire and forget non-blocking network request
-        let _ = self.client.patch(&url).json(&payload).send().await;
+        if let Ok(res) = self.client.patch(&url).json(&payload).send().await {
+            if !res.status().is_success() {
+                let _ = res.text().await;
+            }
+        }
     }
 }
 
