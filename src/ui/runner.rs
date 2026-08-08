@@ -211,8 +211,55 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                     let provider = GitHubProvider::new(&config.github.client_id);
                                     match provider.create_repository(&token, &repo_name, is_private).await {
                                         Ok(ssh_url) => {
+                                            let cwd = env::current_dir().unwrap_or_default();
+                                            let ssh_service = SshService::new(config_mgr.ssh_dir());
+                                            let key_path = ssh_service.resolve_key_path(&acc.key_id);
+
+                                            // 1. Initialize git repo if not already initialized
+                                            let _ = std::process::Command::new("git")
+                                                .args(["init"])
+                                                .current_dir(&cwd)
+                                                .output();
+
+                                            // 2. Set remote origin
+                                            let _ = std::process::Command::new("git")
+                                                .args(["remote", "remove", "origin"])
+                                                .current_dir(&cwd)
+                                                .output();
+                                            let _ = std::process::Command::new("git")
+                                                .args(["remote", "add", "origin", &ssh_url])
+                                                .current_dir(&cwd)
+                                                .output();
+
+                                            // 3. Map folder to GitNest account
+                                            if let Ok(proj) = project_service.map_project(&cwd, &acc.id).await {
+                                                state.active_project = Some(proj);
+                                                if let Ok(projects) = project_service.list_projects().await {
+                                                    state.projects = projects;
+                                                }
+                                            }
+
+                                            // 4. If there are files, auto-commit & push
+                                            let git_service = crate::services::GitService::new();
+                                            let _ = std::process::Command::new("git")
+                                                .args(["add", "."])
+                                                .current_dir(&cwd)
+                                                .output();
+                                            let _ = git_service.execute_ephemeral(
+                                                &cwd,
+                                                &acc,
+                                                &key_path,
+                                                &["commit", "-m", "Initial commit from GitNest"],
+                                            );
+                                            let _ = git_service.execute_ephemeral(
+                                                &cwd,
+                                                &acc,
+                                                &key_path,
+                                                &["push", "-u", "origin", "HEAD"],
+                                            );
+
                                             state.set_notification(
-                                                format!("✓ Created {} repo '{}' on GitHub! URL: {}", if is_private { "private" } else { "public" }, repo_name, ssh_url),
+                                                format!("✓ Created & published repo '{}' to GitHub (@{})!", repo_name, acc.github_username),
                                                 false,
                                             );
                                         }
