@@ -5,7 +5,7 @@ const path = require('path');
 const https = require('https');
 const { execSync } = require('child_process');
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 const REPO = 'siranjeevan/GitNest';
 
 const platform = process.platform;
