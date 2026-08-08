@@ -78,44 +78,64 @@ fn render_dashboard(f: &mut Frame, state: &AppState, area: Rect) {
         .split(main_chunks[0]);
 
     // Active Identity Card
-    let (username, email, status_text) = if let Some(ref acc) = state.active_account {
-        (
-            acc.github_username.as_str(),
-            acc.email.as_str(),
-            "✓ Active & Isolated",
-        )
+    let identity_lines = if let Some(ref acc) = state.active_account {
+        vec![
+            Line::from(vec![
+                Span::styled("● ", Theme::success_badge()),
+                Span::styled(
+                    &acc.github_username,
+                    Style::default()
+                        .fg(Theme::TEXT)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![Span::styled(
+                format!("  {}", acc.email),
+                Style::default().fg(Theme::MUTED),
+            )]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  SSH Key : ", Style::default().fg(Theme::MUTED)),
+                Span::styled("✓ Protected (IdentitiesOnly=yes)", Theme::success_badge()),
+            ]),
+            Line::from(vec![
+                Span::styled("  Security: ", Style::default().fg(Theme::MUTED)),
+                Span::styled("✓ Mapped & Isolated", Theme::success_badge()),
+            ]),
+        ]
     } else {
-        (
-            "Unmapped Directory",
-            "No account assigned",
-            "⚠️ Warning: Global Fallback",
-        )
-    };
+        let (global_user, global_email) = match (&state.global_git_user, &state.global_git_email) {
+            (Some(u), Some(e)) => (u.as_str(), e.as_str()),
+            (Some(u), None) => (u.as_str(), "No global email set"),
+            (None, Some(e)) => ("No global name set", e.as_str()),
+            (None, None) => ("No Global Identity", "Unconfigured"),
+        };
 
-    let identity_lines = vec![
-        Line::from(vec![
-            Span::styled("● ", Theme::success_badge()),
-            Span::styled(
-                username,
-                Style::default()
-                    .fg(Theme::TEXT)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![Span::styled(
-            format!("  {}", email),
-            Style::default().fg(Theme::MUTED),
-        )]),
-        Line::from(""),
-        Line::from(vec![
-            Span::styled("  SSH Key : ", Style::default().fg(Theme::MUTED)),
-            Span::styled("✓ Protected (IdentitiesOnly=yes)", Theme::success_badge()),
-        ]),
-        Line::from(vec![
-            Span::styled("  Security: ", Style::default().fg(Theme::MUTED)),
-            Span::styled(status_text, Theme::success_badge()),
-        ]),
-    ];
+        vec![
+            Line::from(vec![
+                Span::styled("● ", Theme::warning_badge()),
+                Span::styled(
+                    format!("Global Identity: {}", global_user),
+                    Style::default()
+                        .fg(Theme::TEXT)
+                        .add_modifier(Modifier::BOLD),
+                ),
+            ]),
+            Line::from(vec![Span::styled(
+                format!("  {}", global_email),
+                Style::default().fg(Theme::MUTED),
+            )]),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  SSH Key : ", Style::default().fg(Theme::MUTED)),
+                Span::styled("✓ Protected (IdentitiesOnly=yes)", Theme::success_badge()),
+            ]),
+            Line::from(vec![
+                Span::styled("  Security: ", Style::default().fg(Theme::MUTED)),
+                Span::styled("⚠️ Warning: Global Fallback", Theme::warning_badge()),
+            ]),
+        ]
+    };
 
     let identity_card = Paragraph::new(identity_lines).block(
         Block::default()

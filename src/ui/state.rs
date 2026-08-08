@@ -24,6 +24,8 @@ pub struct AppState {
     pub accounts: Vec<Account>,
     pub active_project: Option<Project>,
     pub active_account: Option<Account>,
+    pub global_git_user: Option<String>,
+    pub global_git_email: Option<String>,
     pub notification: Option<(String, bool)>, // (message, is_error)
     pub should_quit: bool,
 }
@@ -40,6 +42,8 @@ impl AppState {
             accounts: Vec::new(),
             active_project: None,
             active_account: None,
+            global_git_user: None,
+            global_git_email: None,
             notification: None,
             should_quit: false,
         }

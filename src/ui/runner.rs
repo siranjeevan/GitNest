@@ -49,6 +49,24 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
         state.active_project = Some(proj);
     }
 
+    // Fetch Global Git Config identity if present
+    let global_user = std::process::Command::new("git")
+        .args(["config", "--global", "user.name"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    let global_email = std::process::Command::new("git")
+        .args(["config", "--global", "user.email"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .ok()
+        .filter(|s| !s.is_empty());
+
+    state.global_git_user = global_user;
+    state.global_git_email = global_email;
+
     // 3. Event Handling Loop
     loop {
         terminal.draw(|f| render_app(f, &state))?;
