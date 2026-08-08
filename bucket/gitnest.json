@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "description": "One Workspace. Multiple Git Identities.",
+  "homepage": "https://github.com/siranjeevan/GitNest",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/siranjeevan/GitNest/releases/download/v1.0.0/gitnest-v1.0.0-windows-x86_64.zip",
+      "hash": "93d2a409f31320a1ceef17ecfcecaee7cfcfed8d3fa8f52fe6305a2e5a720914",
+      "bin": "gitnest.exe"
+    }
+  },
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/siranjeevan/GitNest/releases/download/v$version/gitnest-v$version-windows-x86_64.zip"
+      }
+    }
+  }
+}

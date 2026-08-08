@@ -4,6 +4,13 @@ version = "1.0.0"
 edition = "2021"
 authors = ["GitNest Team"]
 description = "One Workspace. Multiple Git Identities."
+license = "MIT"
+homepage = "https://github.com/siranjeevan/GitNest"
+repository = "https://github.com/siranjeevan/GitNest"
+documentation = "https://github.com/siranjeevan/GitNest"
+readme = "README.md"
+keywords = ["git", "ssh", "identity", "cli", "tui"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4.4", features = ["derive", "env"] }

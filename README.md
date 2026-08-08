@@ -116,16 +116,25 @@ curl -fsSL https://raw.githubusercontent.com/siranjeevan/GitNest/main/install.sh
 brew install siranjeevan/tap/gitnest
 ```
 
-### Option 3: Manual GitHub Releases Download
-Download pre-compiled release binaries directly from [GitHub Releases](https://github.com/siranjeevan/GitNest/releases).
-
-#### macOS
+### Option 3: Cargo (Rust Developers)
 ```bash
-chmod +x gitnest
-mv gitnest /usr/local/bin/
+cargo install gitnest
 ```
 
-#### Linux
+### Option 4: WinGet & Scoop (Windows)
+```powershell
+# WinGet
+winget install siranjeevan.GitNest
+
+# Scoop
+scoop bucket add gitnest https://github.com/siranjeevan/GitNest
+scoop install gitnest
+```
+
+### Option 5: Manual GitHub Releases Download
+Download pre-compiled release binaries directly from [GitHub Releases](https://github.com/siranjeevan/GitNest/releases).
+
+#### macOS / Linux
 ```bash
 chmod +x gitnest
 mv gitnest /usr/local/bin/

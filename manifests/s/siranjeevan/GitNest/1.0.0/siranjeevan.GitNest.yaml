@@ -1,0 +1,25 @@
+# WinGet Package Manifest for GitNest v1.0.0
+PackageIdentifier: siranjeevan.GitNest
+PackageVersion: 1.0.0
+PackageName: GitNest
+Publisher: siranjeevan
+PublisherUrl: https://github.com/siranjeevan
+PackageUrl: https://github.com/siranjeevan/GitNest
+License: MIT
+LicenseUrl: https://github.com/siranjeevan/GitNest/blob/main/LICENSE
+ShortDescription: One Workspace. Multiple Git Identities.
+Moniker: gitnest
+Tags:
+  - git
+  - ssh
+  - identity
+  - security
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    InstallerUrl: https://github.com/siranjeevan/GitNest/releases/download/v1.0.0/gitnest-v1.0.0-windows-x86_64.zip
+    InstallerSha256: 93d2a409f31320a1ceef17ecfcecaee7cfcfed8d3fa8f52fe6305a2e5a720914
+    NestedInstallerFiles:
+      - RelativeFilePath: gitnest.exe
+ManifestType: singleton
+ManifestVersion: 1.4.0
