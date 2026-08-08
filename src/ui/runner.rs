@@ -612,6 +612,32 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         }
                         _ => {}
                     },
+                    Screen::Projects => match key.code {
+                        KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
+                        KeyCode::Char('q') => break,
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            if !state.projects.is_empty() && state.selected_project_index < state.projects.len() - 1 {
+                                state.selected_project_index += 1;
+                            }
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            if state.selected_project_index > 0 {
+                                state.selected_project_index -= 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            if let Some(proj) = state.projects.get(state.selected_project_index).cloned() {
+                                state.active_project = Some(proj.clone());
+                                if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
+                                    state.active_account = Some(acc.clone());
+                                    state.set_notification(format!("Switched active workspace to '{}' (@{})", proj.name, acc.github_username), false);
+                                } else {
+                                    state.set_notification(format!("Switched active workspace to '{}'", proj.name), false);
+                                }
+                            }
+                        }
+                        _ => {}
+                    },
                     _ => match key.code {
                         KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
                         KeyCode::Char('q') => break,
