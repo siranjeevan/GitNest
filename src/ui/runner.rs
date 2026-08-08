@@ -46,6 +46,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
         state.accounts = accounts;
     }
 
+    if let Ok(projects) = project_service.list_projects().await {
+        state.projects = projects;
+    }
+
     let cwd = env::current_dir().unwrap_or_default();
     if let Ok(Some(proj)) = project_service.find_project(&cwd).await {
         if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
@@ -338,7 +342,22 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         }
                         KeyCode::Enter => match state.menu_index {
                             0 => state.show_login_modal = true,
-                            1 => state.current_screen = Screen::Projects,
+                            1 => {
+                                let cwd = env::current_dir().unwrap_or_default();
+                                let target_account = state.active_account.clone().or_else(|| state.accounts.first().cloned());
+                                if let Some(acc) = target_account {
+                                    state.active_account = Some(acc.clone());
+                                    if let Ok(proj) = project_service.map_project(&cwd, &acc.id).await {
+                                        state.active_project = Some(proj);
+                                        if let Ok(projects) = project_service.list_projects().await {
+                                            state.projects = projects;
+                                        }
+                                        state.set_notification(format!("Connected repository '{}' to @{}", cwd.display(), acc.github_username), false);
+                                    }
+                                } else {
+                                    state.show_login_modal = true;
+                                }
+                            },
                             2 => state.current_screen = Screen::CreateRepo,
                             3 => state.current_screen = Screen::CloneRepo,
                             4 => state.current_screen = Screen::Accounts,

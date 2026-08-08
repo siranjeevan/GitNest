@@ -560,18 +560,46 @@ fn render_accounts(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(list, area);
 }
 
-fn render_projects(f: &mut Frame, _state: &AppState, area: Rect) {
-    let text = vec![
-        Line::from(Span::styled("CONNECTED REPOSITORIES", Theme::title())),
-        Line::from(""),
-        Line::from("  Use `gitnest scan` or navigation options to connect local folders."),
-    ];
-    let p = Paragraph::new(text).block(
+fn render_projects(f: &mut Frame, state: &AppState, area: Rect) {
+    let items: Vec<ListItem> = if state.projects.is_empty() {
+        vec![ListItem::new(
+            "No connected repositories found. Run `gitnest scan` or use menu option 1 to connect a folder.",
+        )]
+    } else {
+        state
+            .projects
+            .iter()
+            .enumerate()
+            .map(|(idx, proj)| {
+                let prefix = if idx == state.selected_project_index {
+                    "❯ "
+                } else {
+                    "  "
+                };
+                let style = if idx == state.selected_project_index {
+                    Theme::active_item()
+                } else {
+                    Theme::inactive_item()
+                };
+                let text = format!(
+                    "{}{} ({}) -> Account ID: {}",
+                    prefix,
+                    proj.name,
+                    proj.path.to_string_lossy(),
+                    proj.account_id
+                );
+                ListItem::new(text).style(style)
+            })
+            .collect()
+    };
+
+    let list = List::new(items).block(
         Block::default()
+            .title(" CONNECTED REPOSITORIES & IDENTITY MAPPINGS ")
             .borders(Borders::ALL)
-            .border_style(Theme::border_inactive()),
+            .border_style(Theme::border_active()),
     );
-    f.render_widget(p, area);
+    f.render_widget(list, area);
 }
 
 fn render_security(f: &mut Frame, _state: &AppState, area: Rect) {
