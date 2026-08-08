@@ -22,7 +22,7 @@ impl GitService {
             ssh_key_path.to_string_lossy()
         );
 
-        let mut child = Command::new("git")
+        let child = Command::new("git")
             .args(command_args)
             .current_dir(working_dir)
             .env("GIT_SSH_COMMAND", ssh_command)
@@ -30,17 +30,17 @@ impl GitService {
             .env("GIT_AUTHOR_EMAIL", &account.email)
             .env("GIT_COMMITTER_NAME", &account.name)
             .env("GIT_COMMITTER_EMAIL", &account.email)
-            .stdin(Stdio::inherit())
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit())
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| GitNestError::GitExecutionFailed(format!("Failed to spawn git: {}", e)))?;
 
-        let status = child
-            .wait()
+        let output = child
+            .wait_with_output()
             .map_err(|e| GitNestError::GitExecutionFailed(format!("Git process error: {}", e)))?;
 
-        Ok(status.code().unwrap_or(-1))
+        Ok(output.status.code().unwrap_or(-1))
     }
 
     pub fn get_remote_url(&self, working_dir: &Path) -> Option<String> {
