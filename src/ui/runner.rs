@@ -3,7 +3,7 @@ use crate::domain::account::Account;
 use crate::domain::error::Result;
 use crate::providers::github::GitHubProvider;
 use crate::providers::r#trait::GitProvider;
-use crate::services::{AccountService, ProjectService, SshService};
+use crate::services::{AccountService, ProjectService, SshService, TelemetryService};
 use crate::storage::secure_store::KeyringSecureStore;
 use crate::storage::secure_store::SecureStore;
 use crate::storage::{JsonAccountRepository, JsonProjectRepository};
@@ -224,6 +224,12 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                     if let Ok(updated) = account_service.list_accounts().await {
                                                         state.accounts = updated;
                                                     }
+
+                                                    // Store user profile in Firebase Firestore
+                                                    let telemetry = TelemetryService::new();
+                                                    telemetry
+                                                        .track_user(&provider_user.username, &provider_user.email)
+                                                        .await;
 
                                                     state.login_phase = LoginPhase::Success {
                                                         username: provider_user.username,
