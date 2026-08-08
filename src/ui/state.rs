@@ -24,17 +24,11 @@ pub enum LoginPhase {
         verification_uri: String,
     },
     /// Polling GitHub for token
-    Polling {
-        user_code: String,
-    },
+    Polling { user_code: String },
     /// Successfully authenticated
-    Success {
-        username: String,
-    },
+    Success { username: String },
     /// Error occurred
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 pub struct AppState {

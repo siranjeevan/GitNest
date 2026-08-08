@@ -18,7 +18,10 @@ fn render_help_modal(f: &mut Frame, area: Rect) {
     f.render_widget(Clear, popup_area);
 
     let text = vec![
-        Line::from(Span::styled("KEYBOARD SHORTCUTS CHEAT SHEET", Theme::title())),
+        Line::from(Span::styled(
+            "KEYBOARD SHORTCUTS CHEAT SHEET",
+            Theme::title(),
+        )),
         Line::from(""),
         Line::from("  ↑ / ↓ or j / k  : Navigate menu items"),
         Line::from("  Enter           : Select item or confirm modal"),
@@ -31,7 +34,10 @@ fn render_help_modal(f: &mut Frame, area: Rect) {
         Line::from("  ?               : Toggle this Help Overlay"),
         Line::from("  q or Ctrl + C   : Quit GitNest cleanly"),
         Line::from(""),
-        Line::from(Span::styled("  Press [Esc] or [?] to close.", Style::default().fg(Theme::CYAN))),
+        Line::from(Span::styled(
+            "  Press [Esc] or [?] to close.",
+            Style::default().fg(Theme::CYAN),
+        )),
     ];
 
     let p = Paragraph::new(text).block(
@@ -43,7 +49,12 @@ fn render_help_modal(f: &mut Frame, area: Rect) {
     f.render_widget(p, popup_area);
 }
 
-fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &crate::domain::account::Account, area: Rect) {
+fn render_switch_account_modal(
+    f: &mut Frame,
+    _state: &AppState,
+    target_acc: &crate::domain::account::Account,
+    area: Rect,
+) {
     let popup_area = Rect::new(
         area.width / 4,
         area.height / 3,
@@ -57,7 +68,12 @@ fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
         Line::from(""),
         Line::from(vec![
             Span::styled("Target Identity: ", Style::default().fg(Theme::MUTED)),
-            Span::styled(&target_acc.github_username, Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &target_acc.github_username,
+                Style::default()
+                    .fg(Theme::TEXT)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(vec![
             Span::styled("Email Address  : ", Style::default().fg(Theme::MUTED)),
@@ -68,9 +84,10 @@ fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
             Span::styled(&target_acc.key_id, Style::default().fg(Theme::VIOLET)),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  [Enter] Confirm & Update .git/config   [Esc] Cancel", Theme::warning_badge()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  [Enter] Confirm & Update .git/config   [Esc] Cancel",
+            Theme::warning_badge(),
+        )]),
     ];
 
     let p = Paragraph::new(text).block(
@@ -82,7 +99,12 @@ fn render_switch_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
     f.render_widget(p, popup_area);
 }
 
-fn render_remove_account_modal(f: &mut Frame, _state: &AppState, target_acc: &crate::domain::account::Account, area: Rect) {
+fn render_remove_account_modal(
+    f: &mut Frame,
+    _state: &AppState,
+    target_acc: &crate::domain::account::Account,
+    area: Rect,
+) {
     let popup_area = Rect::new(
         area.width / 4,
         area.height / 3,
@@ -92,11 +114,19 @@ fn render_remove_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
     f.render_widget(Clear, popup_area);
 
     let text = vec![
-        Line::from(Span::styled("CONFIRM ACCOUNT REMOVAL", Theme::error_badge())),
+        Line::from(Span::styled(
+            "CONFIRM ACCOUNT REMOVAL",
+            Theme::error_badge(),
+        )),
         Line::from(""),
         Line::from(vec![
             Span::styled("Target Identity: ", Style::default().fg(Theme::MUTED)),
-            Span::styled(&target_acc.github_username, Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                &target_acc.github_username,
+                Style::default()
+                    .fg(Theme::TEXT)
+                    .add_modifier(Modifier::BOLD),
+            ),
         ]),
         Line::from(vec![
             Span::styled("Email Address  : ", Style::default().fg(Theme::MUTED)),
@@ -107,13 +137,15 @@ fn render_remove_account_modal(f: &mut Frame, _state: &AppState, target_acc: &cr
             Span::styled(&target_acc.key_id, Style::default().fg(Theme::VIOLET)),
         ]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("⚠️ Action cannot be undone! Keyring credentials will be cleared.", Theme::error_badge()),
-        ]),
+        Line::from(vec![Span::styled(
+            "⚠️ Action cannot be undone! Keyring credentials will be cleared.",
+            Theme::error_badge(),
+        )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  [Enter / d] Confirm Remove Account   [Esc] Cancel", Theme::error_badge()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  [Enter / d] Confirm Remove Account   [Esc] Cancel",
+            Theme::error_badge(),
+        )]),
     ];
 
     let p = Paragraph::new(text).block(
@@ -147,101 +179,152 @@ fn render_login_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("  Step 1: ", Style::default().fg(Theme::CYAN)),
-                    Span::styled("Press [Enter] to generate device code & open browser", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "Press [Enter] to generate device code & open browser",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("  Step 2: ", Style::default().fg(Theme::CYAN)),
-                    Span::styled("Paste code & authorize GitNest on GitHub", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "Paste code & authorize GitNest on GitHub",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("  Step 3: ", Style::default().fg(Theme::CYAN)),
-                    Span::styled("GitNest auto-generates Ed25519 SSH keys & vaults tokens", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "GitNest auto-generates Ed25519 SSH keys & vaults tokens",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  [Enter] Start GitHub OAuth Login     [Esc] Cancel", Theme::success_badge()),
-                ]),
+                Line::from(vec![Span::styled(
+                    "  [Enter] Start GitHub OAuth Login     [Esc] Cancel",
+                    Theme::success_badge(),
+                )]),
             ],
             Theme::border_active(),
         ),
-        LoginPhase::WaitingForAuth { user_code, verification_uri } => (
+        LoginPhase::WaitingForAuth {
+            user_code,
+            verification_uri,
+        } => (
             " AUTHORIZE GITNEST ON GITHUB ",
             vec![
                 Line::from(Span::styled("GITHUB DEVICE CODE GENERATED", Theme::title())),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("  Your Verification Code:  ", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "  Your Verification Code:  ",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                     Span::styled(
                         user_code.as_str(),
-                        Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD),
                     ),
-                    Span::styled("  (copied to clipboard!)", Style::default().fg(Theme::SUCCESS)),
+                    Span::styled(
+                        "  (copied to clipboard!)",
+                        Style::default().fg(Theme::SUCCESS),
+                    ),
                 ]),
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled(format!("  {} Browser is opening: ", spinner), Style::default().fg(Theme::CYAN)),
-                    Span::styled(verification_uri.as_str(), Style::default().fg(Theme::VIOLET).add_modifier(Modifier::UNDERLINED)),
+                    Span::styled(
+                        format!("  {} Browser is opening: ", spinner),
+                        Style::default().fg(Theme::CYAN),
+                    ),
+                    Span::styled(
+                        verification_uri.as_str(),
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::UNDERLINED),
+                    ),
                 ]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  Instructions:", Style::default().fg(Theme::CYAN).add_modifier(Modifier::BOLD)),
-                ]),
+                Line::from(vec![Span::styled(
+                    "  Instructions:",
+                    Style::default()
+                        .fg(Theme::CYAN)
+                        .add_modifier(Modifier::BOLD),
+                )]),
                 Line::from(vec![
                     Span::styled("    1. ", Style::default().fg(Theme::MUTED)),
-                    Span::styled("Paste the code above into the GitHub page", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "Paste the code above into the GitHub page",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("    2. ", Style::default().fg(Theme::MUTED)),
-                    Span::styled("Click 'Authorize' to grant GitNest access", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "Click 'Authorize' to grant GitNest access",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(vec![
                     Span::styled("    3. ", Style::default().fg(Theme::MUTED)),
-                    Span::styled("Come back here — GitNest will auto-detect authorization", Style::default().fg(Theme::TEXT)),
+                    Span::styled(
+                        "Come back here — GitNest will auto-detect authorization",
+                        Style::default().fg(Theme::TEXT),
+                    ),
                 ]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(format!("  {} Waiting for authorization...", spinner), Style::default().fg(Theme::CYAN)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("  {} Waiting for authorization...", spinner),
+                    Style::default().fg(Theme::CYAN),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  [Esc] Cancel", Theme::error_badge()),
-                ]),
+                Line::from(vec![Span::styled("  [Esc] Cancel", Theme::error_badge())]),
             ],
             Style::default().fg(Theme::VIOLET),
         ),
         LoginPhase::Polling { user_code } => (
             " POLLING GITHUB FOR AUTHORIZATION ",
             vec![
-                Line::from(Span::styled("AWAITING GITHUB AUTHORIZATION", Theme::title())),
+                Line::from(Span::styled(
+                    "AWAITING GITHUB AUTHORIZATION",
+                    Theme::title(),
+                )),
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("  Code: ", Style::default().fg(Theme::TEXT)),
                     Span::styled(
                         user_code.as_str(),
-                        Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled(format!("  {} Polling GitHub for token...", spinner), Style::default().fg(Theme::CYAN)),
-                ]),
+                Line::from(vec![Span::styled(
+                    format!("  {} Polling GitHub for token...", spinner),
+                    Style::default().fg(Theme::CYAN),
+                )]),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  [Esc] Cancel", Theme::error_badge()),
-                ]),
+                Line::from(vec![Span::styled("  [Esc] Cancel", Theme::error_badge())]),
             ],
             Style::default().fg(Theme::CYAN),
         ),
         LoginPhase::Success { username } => (
             " ACCOUNT ADDED SUCCESSFULLY ",
             vec![
-                Line::from(Span::styled("✓ GITHUB ACCOUNT REGISTERED", Style::default().fg(Theme::SUCCESS).add_modifier(Modifier::BOLD))),
+                Line::from(Span::styled(
+                    "✓ GITHUB ACCOUNT REGISTERED",
+                    Style::default()
+                        .fg(Theme::SUCCESS)
+                        .add_modifier(Modifier::BOLD),
+                )),
                 Line::from(""),
                 Line::from(vec![
                     Span::styled("  Username: ", Style::default().fg(Theme::TEXT)),
                     Span::styled(
                         format!("@{}", username),
-                        Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD),
                     ),
                 ]),
                 Line::from(""),
@@ -249,9 +332,10 @@ fn render_login_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Line::from("  ✓ Ed25519 SSH keypair generated & registered"),
                 Line::from("  ✓ Account ready for identity-scoped Git operations"),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  [Enter / Esc] Close", Theme::success_badge()),
-                ]),
+                Line::from(vec![Span::styled(
+                    "  [Enter / Esc] Close",
+                    Theme::success_badge(),
+                )]),
             ],
             Style::default().fg(Theme::SUCCESS),
         ),
@@ -267,9 +351,10 @@ fn render_login_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Line::from(""),
                 Line::from("  Try again or run `gitnest login` in a separate terminal."),
                 Line::from(""),
-                Line::from(vec![
-                    Span::styled("  [Enter] Retry     [Esc] Close", Theme::error_badge()),
-                ]),
+                Line::from(vec![Span::styled(
+                    "  [Enter] Retry     [Esc] Close",
+                    Theme::error_badge(),
+                )]),
             ],
             Theme::error_badge(),
         ),
@@ -294,10 +379,16 @@ fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(Clear, popup_area);
 
     let cwd = std::env::current_dir().unwrap_or_default();
-    let folder_name = cwd.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "project".to_string());
+    let folder_name = cwd
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "project".to_string());
 
     let mut text = vec![
-        Line::from(Span::styled("CONNECT FOLDER TO GITHUB ACCOUNT", Theme::title())),
+        Line::from(Span::styled(
+            "CONNECT FOLDER TO GITHUB ACCOUNT",
+            Theme::title(),
+        )),
         Line::from(""),
         Line::from(vec![
             Span::styled("  Target Folder  : ", Style::default().fg(Theme::MUTED)),
@@ -308,16 +399,26 @@ fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
             Span::styled(&folder_name, Style::default().fg(Theme::TEXT)),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  Select GitHub Identity to Bind: (↑/↓ to switch)", Style::default().fg(Theme::MUTED))),
+        Line::from(Span::styled(
+            "  Select GitHub Identity to Bind: (↑/↓ to switch)",
+            Style::default().fg(Theme::MUTED),
+        )),
         Line::from(""),
     ];
 
     if state.accounts.is_empty() {
-        text.push(Line::from(Span::styled("  No registered accounts. Press 'a' or login first.", Theme::warning_badge())));
+        text.push(Line::from(Span::styled(
+            "  No registered accounts. Press 'a' or login first.",
+            Theme::warning_badge(),
+        )));
     } else {
         for (idx, acc) in state.accounts.iter().enumerate() {
             let is_selected = idx == state.selected_connect_account_index;
-            let prefix = if is_selected { "  ❯ ● " } else { "    ○ " };
+            let prefix = if is_selected {
+                "  ❯ ● "
+            } else {
+                "    ○ "
+            };
             let style = if is_selected {
                 Theme::active_item()
             } else {
@@ -327,17 +428,27 @@ fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled(prefix, style),
                 Span::styled(
                     format!("@{} ", acc.github_username),
-                    if is_selected { Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD) } else { Style::default().fg(Theme::TEXT) },
+                    if is_selected {
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Theme::TEXT)
+                    },
                 ),
-                Span::styled(format!("({})", acc.email), Style::default().fg(Theme::MUTED)),
+                Span::styled(
+                    format!("({})", acc.email),
+                    Style::default().fg(Theme::MUTED),
+                ),
             ]));
         }
     }
 
     text.push(Line::from(""));
-    text.push(Line::from(vec![
-        Span::styled("  [Enter] Connect Selected Account     [↑/↓] Change Account     [Esc] Cancel", Theme::success_badge()),
-    ]));
+    text.push(Line::from(vec![Span::styled(
+        "  [Enter] Connect Selected Account     [↑/↓] Change Account     [Esc] Cancel",
+        Theme::success_badge(),
+    )]));
 
     let p = Paragraph::new(text).block(
         Block::default()
@@ -357,7 +468,11 @@ fn render_create_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
     );
     f.render_widget(Clear, popup_area);
 
-    let vis_str = if state.create_repo_is_private { "🔒 Private" } else { "🌐 Public" };
+    let vis_str = if state.create_repo_is_private {
+        "🔒 Private"
+    } else {
+        "🌐 Public"
+    };
 
     let mut text = vec![
         Line::from(Span::styled("CREATE NEW GITHUB REPOSITORY", Theme::title())),
@@ -365,26 +480,58 @@ fn render_create_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
         Line::from(vec![
             Span::styled("  Repository Name: ", Style::default().fg(Theme::MUTED)),
             Span::styled(
-                if state.create_repo_name.is_empty() { "Type name..." } else { state.create_repo_name.as_str() },
-                if state.create_repo_name.is_empty() { Style::default().fg(Theme::MUTED) } else { Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD) },
+                if state.create_repo_name.is_empty() {
+                    "Type name..."
+                } else {
+                    state.create_repo_name.as_str()
+                },
+                if state.create_repo_name.is_empty() {
+                    Style::default().fg(Theme::MUTED)
+                } else {
+                    Style::default()
+                        .fg(Theme::TEXT)
+                        .add_modifier(Modifier::BOLD)
+                },
             ),
         ]),
         Line::from(vec![
             Span::styled("  Visibility     : ", Style::default().fg(Theme::MUTED)),
-            Span::styled(vis_str, Style::default().fg(if state.create_repo_is_private { Theme::VIOLET } else { Theme::CYAN }).add_modifier(Modifier::BOLD)),
-            Span::styled("  (Press [Tab] to toggle Private / Public)", Style::default().fg(Theme::MUTED)),
+            Span::styled(
+                vis_str,
+                Style::default()
+                    .fg(if state.create_repo_is_private {
+                        Theme::VIOLET
+                    } else {
+                        Theme::CYAN
+                    })
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                "  (Press [Tab] to toggle Private / Public)",
+                Style::default().fg(Theme::MUTED),
+            ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  Select Account Owner: (↑/↓ to switch)", Style::default().fg(Theme::MUTED))),
+        Line::from(Span::styled(
+            "  Select Account Owner: (↑/↓ to switch)",
+            Style::default().fg(Theme::MUTED),
+        )),
         Line::from(""),
     ];
 
     if state.accounts.is_empty() {
-        text.push(Line::from(Span::styled("  No registered accounts. Press 'a' to add an account first.", Theme::warning_badge())));
+        text.push(Line::from(Span::styled(
+            "  No registered accounts. Press 'a' to add an account first.",
+            Theme::warning_badge(),
+        )));
     } else {
         for (idx, acc) in state.accounts.iter().enumerate() {
             let is_selected = idx == state.selected_create_account_index;
-            let prefix = if is_selected { "  ❯ ● " } else { "    ○ " };
+            let prefix = if is_selected {
+                "  ❯ ● "
+            } else {
+                "    ○ "
+            };
             let style = if is_selected {
                 Theme::active_item()
             } else {
@@ -394,17 +541,27 @@ fn render_create_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled(prefix, style),
                 Span::styled(
                     format!("@{} ", acc.github_username),
-                    if is_selected { Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD) } else { Style::default().fg(Theme::TEXT) },
+                    if is_selected {
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Theme::TEXT)
+                    },
                 ),
-                Span::styled(format!("({})", acc.email), Style::default().fg(Theme::MUTED)),
+                Span::styled(
+                    format!("({})", acc.email),
+                    Style::default().fg(Theme::MUTED),
+                ),
             ]));
         }
     }
 
     text.push(Line::from(""));
-    text.push(Line::from(vec![
-        Span::styled("  [Enter] Create Repo     [Tab] Toggle Vis     [↑/↓] Change Account     [Esc] Cancel", Theme::success_badge()),
-    ]));
+    text.push(Line::from(vec![Span::styled(
+        "  [Enter] Create Repo     [Tab] Toggle Vis     [↑/↓] Change Account     [Esc] Cancel",
+        Theme::success_badge(),
+    )]));
 
     let p = Paragraph::new(text).block(
         Block::default()
@@ -425,26 +582,49 @@ fn render_clone_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(Clear, popup_area);
 
     let mut text = vec![
-        Line::from(Span::styled("CLONE REPOSITORY WITH IDENTITY", Theme::title())),
+        Line::from(Span::styled(
+            "CLONE REPOSITORY WITH IDENTITY",
+            Theme::title(),
+        )),
         Line::from(""),
         Line::from(vec![
             Span::styled("  Repository URL : ", Style::default().fg(Theme::MUTED)),
             Span::styled(
-                if state.clone_repo_url.is_empty() { "Paste git URL (e.g. git@github.com:user/repo.git)..." } else { state.clone_repo_url.as_str() },
-                if state.clone_repo_url.is_empty() { Style::default().fg(Theme::MUTED) } else { Style::default().fg(Theme::CYAN).add_modifier(Modifier::BOLD) },
+                if state.clone_repo_url.is_empty() {
+                    "Paste git URL (e.g. git@github.com:user/repo.git)..."
+                } else {
+                    state.clone_repo_url.as_str()
+                },
+                if state.clone_repo_url.is_empty() {
+                    Style::default().fg(Theme::MUTED)
+                } else {
+                    Style::default()
+                        .fg(Theme::CYAN)
+                        .add_modifier(Modifier::BOLD)
+                },
             ),
         ]),
         Line::from(""),
-        Line::from(Span::styled("  Select Identity to Clone With: (↑/↓ to switch)", Style::default().fg(Theme::MUTED))),
+        Line::from(Span::styled(
+            "  Select Identity to Clone With: (↑/↓ to switch)",
+            Style::default().fg(Theme::MUTED),
+        )),
         Line::from(""),
     ];
 
     if state.accounts.is_empty() {
-        text.push(Line::from(Span::styled("  No registered accounts. Press 'a' to add an account first.", Theme::warning_badge())));
+        text.push(Line::from(Span::styled(
+            "  No registered accounts. Press 'a' to add an account first.",
+            Theme::warning_badge(),
+        )));
     } else {
         for (idx, acc) in state.accounts.iter().enumerate() {
             let is_selected = idx == state.selected_clone_account_index;
-            let prefix = if is_selected { "  ❯ ● " } else { "    ○ " };
+            let prefix = if is_selected {
+                "  ❯ ● "
+            } else {
+                "    ○ "
+            };
             let style = if is_selected {
                 Theme::active_item()
             } else {
@@ -454,17 +634,27 @@ fn render_clone_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
                 Span::styled(prefix, style),
                 Span::styled(
                     format!("@{} ", acc.github_username),
-                    if is_selected { Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD) } else { Style::default().fg(Theme::TEXT) },
+                    if is_selected {
+                        Style::default()
+                            .fg(Theme::VIOLET)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Theme::TEXT)
+                    },
                 ),
-                Span::styled(format!("({})", acc.email), Style::default().fg(Theme::MUTED)),
+                Span::styled(
+                    format!("({})", acc.email),
+                    Style::default().fg(Theme::MUTED),
+                ),
             ]));
         }
     }
 
     text.push(Line::from(""));
-    text.push(Line::from(vec![
-        Span::styled("  [Enter] Clone Repository     [↑/↓] Change Account     [Esc] Cancel", Theme::success_badge()),
-    ]));
+    text.push(Line::from(vec![Span::styled(
+        "  [Enter] Clone Repository     [↑/↓] Change Account     [Esc] Cancel",
+        Theme::success_badge(),
+    )]));
 
     let p = Paragraph::new(text).block(
         Block::default()
@@ -946,7 +1136,10 @@ fn render_command_palette(f: &mut Frame, state: &AppState, area: Rect) {
     let title_text = if state.command_palette_query.is_empty() {
         " COMMAND PALETTE (Type to search...) ".to_string()
     } else {
-        format!(" COMMAND PALETTE (Filter: '{}') ", state.command_palette_query)
+        format!(
+            " COMMAND PALETTE (Filter: '{}') ",
+            state.command_palette_query
+        )
     };
 
     let list = List::new(items).block(
@@ -968,7 +1161,10 @@ fn render_footer(f: &mut Frame, state: &AppState, area: Rect) {
         } else {
             Theme::success_badge()
         };
-        Line::from(vec![Span::styled(format!("  {} Notice: {}", spinner, msg), style)])
+        Line::from(vec![Span::styled(
+            format!("  {} Notice: {}", spinner, msg),
+            style,
+        )])
     } else {
         Line::from(vec![
             Span::styled(format!("  {} ", spinner), Style::default().fg(Theme::CYAN)),

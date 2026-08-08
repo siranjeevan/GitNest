@@ -98,7 +98,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             if let Some(target) = state.modal_switch_account.take() {
                                 state.active_account = Some(target.clone());
                                 state.set_notification(
-                                    format!("Switched identity context to {}", target.github_username),
+                                    format!(
+                                        "Switched identity context to {}",
+                                        target.github_username
+                                    ),
                                     false,
                                 );
                             }
@@ -115,20 +118,29 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             if let Some(target) = state.modal_remove_account.take() {
                                 let username = target.github_username.clone();
                                 if let Err(e) = account_service.remove_account(&target.id).await {
-                                    state.set_notification(format!("Failed to remove account: {}", e), true);
+                                    state.set_notification(
+                                        format!("Failed to remove account: {}", e),
+                                        true,
+                                    );
                                 } else {
                                     if let Ok(updated) = account_service.list_accounts().await {
                                         state.accounts = updated;
                                     }
-                                    if state.selected_account_index > 0 && state.selected_account_index >= state.accounts.len() {
-                                        state.selected_account_index = state.accounts.len().saturating_sub(1);
+                                    if state.selected_account_index > 0
+                                        && state.selected_account_index >= state.accounts.len()
+                                    {
+                                        state.selected_account_index =
+                                            state.accounts.len().saturating_sub(1);
                                     }
                                     if let Some(ref active) = state.active_account {
                                         if active.id == target.id {
                                             state.active_account = None;
                                         }
                                     }
-                                    state.set_notification(format!("Account @{} removed successfully", username), false);
+                                    state.set_notification(
+                                        format!("Account @{} removed successfully", username),
+                                        false,
+                                    );
                                 }
                             }
                         }
@@ -141,7 +153,9 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     match key.code {
                         KeyCode::Esc => state.show_connect_modal = false,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            if !state.accounts.is_empty() && state.selected_connect_account_index < state.accounts.len() - 1 {
+                            if !state.accounts.is_empty()
+                                && state.selected_connect_account_index < state.accounts.len() - 1
+                            {
                                 state.selected_connect_account_index += 1;
                             }
                         }
@@ -153,7 +167,11 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         KeyCode::Enter => {
                             state.show_connect_modal = false;
                             let cwd = env::current_dir().unwrap_or_default();
-                            let target_account = state.accounts.get(state.selected_connect_account_index).cloned().or_else(|| state.active_account.clone());
+                            let target_account = state
+                                .accounts
+                                .get(state.selected_connect_account_index)
+                                .cloned()
+                                .or_else(|| state.active_account.clone());
                             if let Some(acc) = target_account {
                                 state.active_account = Some(acc.clone());
                                 if let Ok(proj) = project_service.map_project(&cwd, &acc.id).await {
@@ -161,7 +179,14 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                     if let Ok(projects) = project_service.list_projects().await {
                                         state.projects = projects;
                                     }
-                                    state.set_notification(format!("Connected repository '{}' to @{}", cwd.display(), acc.github_username), false);
+                                    state.set_notification(
+                                        format!(
+                                            "Connected repository '{}' to @{}",
+                                            cwd.display(),
+                                            acc.github_username
+                                        ),
+                                        false,
+                                    );
                                 }
                             } else {
                                 state.show_login_modal = true;
@@ -179,7 +204,9 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             state.create_repo_is_private = !state.create_repo_is_private;
                         }
                         KeyCode::Down => {
-                            if !state.accounts.is_empty() && state.selected_create_account_index < state.accounts.len() - 1 {
+                            if !state.accounts.is_empty()
+                                && state.selected_create_account_index < state.accounts.len() - 1
+                            {
                                 state.selected_create_account_index += 1;
                             }
                         }
@@ -199,21 +226,31 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         KeyCode::Enter => {
                             if state.create_repo_name.trim().is_empty() {
                                 state.set_notification("Repository name cannot be empty", true);
-                            } else if let Some(acc) = state.accounts.get(state.selected_create_account_index).cloned() {
+                            } else if let Some(acc) = state
+                                .accounts
+                                .get(state.selected_create_account_index)
+                                .cloned()
+                            {
                                 let repo_name = state.create_repo_name.trim().to_string();
                                 let is_private = state.create_repo_is_private;
                                 state.show_create_repo_modal = false;
 
                                 // Fetch token from Keyring
                                 let secure_store = KeyringSecureStore::new();
-                                if let Ok(Some(token)) = secure_store.get_token(&acc.github_username) {
+                                if let Ok(Some(token)) =
+                                    secure_store.get_token(&acc.github_username)
+                                {
                                     let config = config_mgr.load_config().unwrap_or_default();
                                     let provider = GitHubProvider::new(&config.github.client_id);
-                                    match provider.create_repository(&token, &repo_name, is_private).await {
+                                    match provider
+                                        .create_repository(&token, &repo_name, is_private)
+                                        .await
+                                    {
                                         Ok(ssh_url) => {
                                             let cwd = env::current_dir().unwrap_or_default();
                                             let ssh_service = SshService::new(config_mgr.ssh_dir());
-                                            let key_path = ssh_service.resolve_key_path(&acc.key_id);
+                                            let key_path =
+                                                ssh_service.resolve_key_path(&acc.key_id);
 
                                             // 1. Initialize git repo with 'main' as default branch
                                             let _ = std::process::Command::new("git")
@@ -238,9 +275,13 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                 .output();
 
                                             // 3. Map folder to GitNest account
-                                            if let Ok(proj) = project_service.map_project(&cwd, &acc.id).await {
+                                            if let Ok(proj) =
+                                                project_service.map_project(&cwd, &acc.id).await
+                                            {
                                                 state.active_project = Some(proj);
-                                                if let Ok(projects) = project_service.list_projects().await {
+                                                if let Ok(projects) =
+                                                    project_service.list_projects().await
+                                                {
                                                     state.projects = projects;
                                                 }
                                             }
@@ -270,7 +311,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                             );
                                         }
                                         Err(e) => {
-                                            state.set_notification(format!("Failed to create repo: {}", e), true);
+                                            state.set_notification(
+                                                format!("Failed to create repo: {}", e),
+                                                true,
+                                            );
                                         }
                                     }
                                 } else {
@@ -289,7 +333,9 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     match key.code {
                         KeyCode::Esc => state.show_clone_repo_modal = false,
                         KeyCode::Down => {
-                            if !state.accounts.is_empty() && state.selected_clone_account_index < state.accounts.len() - 1 {
+                            if !state.accounts.is_empty()
+                                && state.selected_clone_account_index < state.accounts.len() - 1
+                            {
                                 state.selected_clone_account_index += 1;
                             }
                         }
@@ -309,8 +355,12 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         KeyCode::Enter => {
                             if state.clone_repo_url.trim().is_empty() {
                                 state.set_notification("Repository URL cannot be empty", true);
-                            } else if let Some(acc) = state.accounts.get(state.selected_clone_account_index).cloned() {
-                                 let repo_url = state.clone_repo_url.trim().to_string();
+                            } else if let Some(acc) = state
+                                .accounts
+                                .get(state.selected_clone_account_index)
+                                .cloned()
+                            {
+                                let repo_url = state.clone_repo_url.trim().to_string();
                                 state.show_clone_repo_modal = false;
 
                                 let git_service = crate::services::GitService::new();
@@ -319,25 +369,43 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                 let key_path = ssh_service.resolve_key_path(&acc.key_id);
 
                                 let secure_store = KeyringSecureStore::new();
-                                let token = secure_store.get_token(&acc.github_username).ok().flatten();
+                                let token =
+                                    secure_store.get_token(&acc.github_username).ok().flatten();
 
-                                state.set_notification(format!("Cloning repository with @{}...", acc.github_username), false);
-                                match git_service.clone_repo(&repo_url, &cwd, &key_path, token.as_deref()) {
+                                state.set_notification(
+                                    format!("Cloning repository with @{}...", acc.github_username),
+                                    false,
+                                );
+                                match git_service.clone_repo(
+                                    &repo_url,
+                                    &cwd,
+                                    &key_path,
+                                    token.as_deref(),
+                                ) {
                                     Ok(cloned_path) => {
                                         // Auto-map cloned project to account
-                                        if let Ok(proj) = project_service.map_project(&cloned_path, &acc.id).await {
+                                        if let Ok(proj) =
+                                            project_service.map_project(&cloned_path, &acc.id).await
+                                        {
                                             state.active_project = Some(proj);
-                                            if let Ok(projects) = project_service.list_projects().await {
+                                            if let Ok(projects) =
+                                                project_service.list_projects().await
+                                            {
                                                 state.projects = projects;
                                             }
                                         }
                                         state.set_notification(
-                                            format!("✓ Cloned repo to '{}' bound to @{}!", cloned_path.display(), acc.github_username),
+                                            format!(
+                                                "✓ Cloned repo to '{}' bound to @{}!",
+                                                cloned_path.display(),
+                                                acc.github_username
+                                            ),
                                             false,
                                         );
                                     }
                                     Err(e) => {
-                                        state.set_notification(format!("Clone failed: {}", e), true);
+                                        state
+                                            .set_notification(format!("Clone failed: {}", e), true);
                                     }
                                 }
                             } else {
@@ -396,37 +464,64 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                     };
                                     terminal.draw(|f| render_app(f, &state)).ok();
 
-                                    match provider.poll_for_token(&device_res.device_code, device_res.interval).await {
+                                    match provider
+                                        .poll_for_token(
+                                            &device_res.device_code,
+                                            device_res.interval,
+                                        )
+                                        .await
+                                    {
                                         Ok(token) => {
                                             // Fetch user info
                                             match provider.fetch_user_info(&token).await {
                                                 Ok(provider_user) => {
                                                     // Generate SSH key
-                                                    let ssh_service = SshService::new(config_mgr.ssh_dir());
-                                                    let key_id = format!("id_ed25519_{}", provider_user.username);
+                                                    let ssh_service =
+                                                        SshService::new(config_mgr.ssh_dir());
+                                                    let key_id = format!(
+                                                        "id_ed25519_{}",
+                                                        provider_user.username
+                                                    );
                                                     let key_path = ssh_service.generate_keypair(
                                                         &key_id,
-                                                        &format!("gitnest-{}", provider_user.username),
+                                                        &format!(
+                                                            "gitnest-{}",
+                                                            provider_user.username
+                                                        ),
                                                     );
 
                                                     // Upload SSH key to GitHub
                                                     if let Ok(ref kp) = key_path {
-                                                        let pub_path = format!("{}.pub", kp.to_string_lossy());
-                                                        if let Ok(pub_key_str) = std::fs::read_to_string(&pub_path) {
-                                                            let _ = provider.upload_ssh_key(
-                                                                &token,
-                                                                &format!("GitNest Key ({})", provider_user.username),
-                                                                &pub_key_str,
-                                                            ).await;
+                                                        let pub_path =
+                                                            format!("{}.pub", kp.to_string_lossy());
+                                                        if let Ok(pub_key_str) =
+                                                            std::fs::read_to_string(&pub_path)
+                                                        {
+                                                            let _ = provider
+                                                                .upload_ssh_key(
+                                                                    &token,
+                                                                    &format!(
+                                                                        "GitNest Key ({})",
+                                                                        provider_user.username
+                                                                    ),
+                                                                    &pub_key_str,
+                                                                )
+                                                                .await;
                                                         }
                                                     }
 
                                                     // Store token in keychain
                                                     let secure_store = KeyringSecureStore::new();
-                                                    let _ = secure_store.store_token(&provider_user.username, &token);
+                                                    let _ = secure_store.store_token(
+                                                        &provider_user.username,
+                                                        &token,
+                                                    );
 
                                                     // Register account
-                                                    let display_name = provider_user.name.unwrap_or_else(|| provider_user.username.clone());
+                                                    let display_name =
+                                                        provider_user.name.unwrap_or_else(|| {
+                                                            provider_user.username.clone()
+                                                        });
                                                     let account = Account::new(
                                                         display_name,
                                                         provider_user.email.clone(),
@@ -434,17 +529,23 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                         "github",
                                                         key_id,
                                                     );
-                                                    let _ = account_service.add_account(account).await;
+                                                    let _ =
+                                                        account_service.add_account(account).await;
 
                                                     // Refresh accounts list
-                                                    if let Ok(updated) = account_service.list_accounts().await {
+                                                    if let Ok(updated) =
+                                                        account_service.list_accounts().await
+                                                    {
                                                         state.accounts = updated;
                                                     }
 
                                                     // Store user profile in Firebase Firestore
                                                     let telemetry = TelemetryService::new();
                                                     telemetry
-                                                        .track_user(&provider_user.username, &provider_user.email)
+                                                        .track_user(
+                                                            &provider_user.username,
+                                                            &provider_user.email,
+                                                        )
                                                         .await;
 
                                                     state.login_phase = LoginPhase::Success {
@@ -453,7 +554,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                                 }
                                                 Err(e) => {
                                                     state.login_phase = LoginPhase::Error {
-                                                        message: format!("Failed to fetch user info: {}", e),
+                                                        message: format!(
+                                                            "Failed to fetch user info: {}",
+                                                            e
+                                                        ),
                                                     };
                                                 }
                                             }
@@ -472,7 +576,10 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                 }
                             }
                         }
-                        (LoginPhase::WaitingForAuth { .. } | LoginPhase::Polling { .. }, KeyCode::Esc) => {
+                        (
+                            LoginPhase::WaitingForAuth { .. } | LoginPhase::Polling { .. },
+                            KeyCode::Esc,
+                        ) => {
                             state.show_login_modal = false;
                             state.login_phase = LoginPhase::Ready;
                         }
@@ -499,13 +606,11 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                 }
 
                 // Global Shortcuts
-                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
-                {
+                if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
                     break;
                 }
 
-                if key.code == KeyCode::Char('k') && key.modifiers.contains(KeyModifiers::CONTROL)
-                {
+                if key.code == KeyCode::Char('k') && key.modifiers.contains(KeyModifiers::CONTROL) {
                     state.command_palette_query.clear();
                     state.command_palette_index = 0;
                     state.current_screen = Screen::CommandPalette;
@@ -561,33 +666,39 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             1 => {
                                 state.selected_connect_account_index = 0;
                                 if let Some(ref active) = state.active_account {
-                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                    if let Some(pos) =
+                                        state.accounts.iter().position(|a| a.id == active.id)
+                                    {
                                         state.selected_connect_account_index = pos;
                                     }
                                 }
                                 state.show_connect_modal = true;
-                            },
+                            }
                             2 => {
                                 state.create_repo_name.clear();
                                 state.create_repo_is_private = true;
                                 state.selected_create_account_index = 0;
                                 if let Some(ref active) = state.active_account {
-                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                    if let Some(pos) =
+                                        state.accounts.iter().position(|a| a.id == active.id)
+                                    {
                                         state.selected_create_account_index = pos;
                                     }
                                 }
                                 state.show_create_repo_modal = true;
-                            },
+                            }
                             3 => {
                                 state.clone_repo_url.clear();
                                 state.selected_clone_account_index = 0;
                                 if let Some(ref active) = state.active_account {
-                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                    if let Some(pos) =
+                                        state.accounts.iter().position(|a| a.id == active.id)
+                                    {
                                         state.selected_clone_account_index = pos;
                                     }
                                 }
                                 state.show_clone_repo_modal = true;
-                            },
+                            }
                             4 => state.current_screen = Screen::Accounts,
                             5 => state.current_screen = Screen::Projects,
                             6 => state.current_screen = Screen::Security,
@@ -599,10 +710,14 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         _ => {}
                     },
                     Screen::Accounts => match key.code {
-                        KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
+                        KeyCode::Esc | KeyCode::Char('b') => {
+                            state.current_screen = Screen::Dashboard
+                        }
                         KeyCode::Char('q') => break,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            if !state.accounts.is_empty() && state.selected_account_index < state.accounts.len() - 1 {
+                            if !state.accounts.is_empty()
+                                && state.selected_account_index < state.accounts.len() - 1
+                            {
                                 state.selected_account_index += 1;
                             }
                         }
@@ -625,7 +740,9 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     },
                     Screen::CommandPalette => match key.code {
                         KeyCode::Esc => state.current_screen = Screen::Dashboard,
-                        KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => break,
+                        KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            break
+                        }
                         KeyCode::Backspace => {
                             state.command_palette_query.pop();
                             state.command_palette_index = 0;
@@ -666,10 +783,14 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                         _ => {}
                     },
                     Screen::Projects => match key.code {
-                        KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
+                        KeyCode::Esc | KeyCode::Char('b') => {
+                            state.current_screen = Screen::Dashboard
+                        }
                         KeyCode::Char('q') => break,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            if !state.projects.is_empty() && state.selected_project_index < state.projects.len() - 1 {
+                            if !state.projects.is_empty()
+                                && state.selected_project_index < state.projects.len() - 1
+                            {
                                 state.selected_project_index += 1;
                             }
                         }
@@ -679,20 +800,35 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             }
                         }
                         KeyCode::Enter => {
-                            if let Some(proj) = state.projects.get(state.selected_project_index).cloned() {
+                            if let Some(proj) =
+                                state.projects.get(state.selected_project_index).cloned()
+                            {
                                 state.active_project = Some(proj.clone());
-                                if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
+                                if let Ok(Some(acc)) =
+                                    account_service.find_account(&proj.account_id).await
+                                {
                                     state.active_account = Some(acc.clone());
-                                    state.set_notification(format!("Switched active workspace to '{}' (@{})", proj.name, acc.github_username), false);
+                                    state.set_notification(
+                                        format!(
+                                            "Switched active workspace to '{}' (@{})",
+                                            proj.name, acc.github_username
+                                        ),
+                                        false,
+                                    );
                                 } else {
-                                    state.set_notification(format!("Switched active workspace to '{}'", proj.name), false);
+                                    state.set_notification(
+                                        format!("Switched active workspace to '{}'", proj.name),
+                                        false,
+                                    );
                                 }
                             }
                         }
                         _ => {}
                     },
                     _ => match key.code {
-                        KeyCode::Esc | KeyCode::Char('b') => state.current_screen = Screen::Dashboard,
+                        KeyCode::Esc | KeyCode::Char('b') => {
+                            state.current_screen = Screen::Dashboard
+                        }
                         KeyCode::Char('q') => break,
                         _ => {}
                     },

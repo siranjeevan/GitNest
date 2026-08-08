@@ -83,7 +83,13 @@ impl GitService {
         }
     }
 
-    pub fn clone_repo(&self, repo_url: &str, target_dir: &Path, ssh_key_path: &Path, token: Option<&str>) -> Result<std::path::PathBuf> {
+    pub fn clone_repo(
+        &self,
+        repo_url: &str,
+        target_dir: &Path,
+        ssh_key_path: &Path,
+        token: Option<&str>,
+    ) -> Result<std::path::PathBuf> {
         let mut cmd = Command::new("git");
         cmd.arg("clone");
 
@@ -115,9 +121,9 @@ impl GitService {
             cmd.env("GIT_SSH_COMMAND", ssh_command);
         }
 
-        let output = cmd
-            .output()
-            .map_err(|e| GitNestError::GitExecutionFailed(format!("Failed to spawn git clone: {}", e)))?;
+        let output = cmd.output().map_err(|e| {
+            GitNestError::GitExecutionFailed(format!("Failed to spawn git clone: {}", e))
+        })?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -127,7 +133,10 @@ impl GitService {
             } else {
                 stderr.to_string()
             };
-            return Err(GitNestError::GitExecutionFailed(format!("git clone failed: {}", sanitized_err.trim())));
+            return Err(GitNestError::GitExecutionFailed(format!(
+                "git clone failed: {}",
+                sanitized_err.trim()
+            )));
         }
 
         // Extract folder name from URL (e.g., git@github.com:user/repo.git -> repo)
