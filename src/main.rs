@@ -30,7 +30,10 @@ async fn main() {
             }
         }
         None => {
-            gitnest::cli::handlers::render_dashboard(&config_mgr).await;
+            if let Err(e) = gitnest::ui::run_tui_dashboard(&config_mgr).await {
+                eprintln!("Error running TUI dashboard: {}", e);
+                gitnest::cli::handlers::render_dashboard(&config_mgr).await;
+            }
         }
     }
 }

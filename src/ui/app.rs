@@ -1,7 +1,6 @@
 use crate::ui::state::{AppState, Screen};
 use crate::ui::theme::Theme;
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
@@ -9,7 +8,7 @@ use ratatui::{
     Frame,
 };
 
-pub fn render_app<B: Backend>(f: &mut Frame, state: &AppState) {
+pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
     // Create main vertical layout
