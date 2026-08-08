@@ -5,7 +5,7 @@ const path = require('path');
 const https = require('https');
 const { execSync } = require('child_process');
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 const REPO = 'siranjeevan/GitNest';
 
 const platform = process.platform;
@@ -41,9 +41,19 @@ console.log(`[gitnest] Downloading binary for ${platform}-${arch} from GitHub Re
 
 function download(url, dest, cb) {
   const file = fs.createWriteStream(dest);
-  https.get(url, (response) => {
+  const options = {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) GitNest/1.0'
+    }
+  };
+  https.get(url, options, (response) => {
     if (response.statusCode === 302 || response.statusCode === 301) {
       return download(response.headers.location, dest, cb);
+    }
+    if (response.statusCode !== 200) {
+      fs.unlinkSync(dest);
+      console.error(`[gitnest] Download failed with HTTP status ${response.statusCode}`);
+      process.exit(1);
     }
     response.pipe(file);
     file.on('finish', () => {
