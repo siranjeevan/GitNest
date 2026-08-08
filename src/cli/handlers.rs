@@ -173,7 +173,7 @@ async fn handle_login(
     let display_name = provider_user.name.unwrap_or_else(|| provider_user.username.clone());
     let account = Account::new(display_name, provider_user.email.clone(), provider_user.username.clone(), "github", key_id);
 
-    if let Err(_) = account_service.add_account(account).await {
+    if account_service.add_account(account).await.is_err() {
         println!("\nAccount '{}' updated successfully with new credentials!", provider_user.username);
     } else {
         println!("\nAccount successfully registered with GitNest!");
@@ -234,7 +234,7 @@ async fn handle_project_add(
         Some(target) => accounts
             .into_iter()
             .find(|a| a.id == target || a.github_username == target)
-            .ok_or_else(|| GitNestError::AccountNotFound(target))?,
+            .ok_or(GitNestError::AccountNotFound(target))?,
         None => {
             println!("Select GitHub Account for project:");
             for (idx, acc) in accounts.iter().enumerate() {
@@ -396,17 +396,27 @@ async fn handle_doctor(config_mgr: ConfigManager) -> Result<()> {
     let doctor = DoctorService::new(config_mgr);
     let report = doctor.run_diagnostics().await;
 
-    println!("\n--- GitNest Health Diagnostic Report ---");
-    println!("✓ Git Installed      : {} ({})", report.git_installed, report.git_version.unwrap_or_default());
-    println!("✓ SSH Installed      : {}", report.ssh_installed);
-    println!("✓ GitHub Reachable   : {}", report.github_reachable);
-    println!("✓ Config Exists      : {}", report.config_exists);
-    println!("✓ SSH Directory      : {}", report.ssh_dir_exists);
-    println!("✓ Keyring Store      : {}", report.keyring_available);
-    println!("✓ JSON Storage Valid : {}", report.json_files_valid);
-    println!("✓ Accounts Count     : {}", report.registered_accounts_count);
-    println!("✓ Mapped Projects    : {}", report.mapped_projects_count);
-    println!();
+    let env_warnings = crate::security::EnvGuard::inspect_environment();
+
+    println!("\n=== GitNest Health & Identity Diagnostic Report ===");
+    println!("  [PASS] Git Engine        : Installed ({})", report.git_version.unwrap_or_default());
+    println!("  [{}] SSH Engine        : {}", if report.ssh_installed { "PASS" } else { "ERROR" }, if report.ssh_installed { "Installed" } else { "Missing" });
+    println!("  [{}] GitHub Network    : {}", if report.github_reachable { "PASS" } else { "WARNING" }, if report.github_reachable { "Reachable" } else { "Unreachable/Offline" });
+    println!("  [{}] Configuration     : {}", if report.config_exists { "PASS" } else { "ERROR" }, if report.config_exists { "Valid" } else { "Missing" });
+    println!("  [{}] SSH Key Storage   : {}", if report.ssh_dir_exists { "PASS" } else { "ERROR" }, if report.ssh_dir_exists { "Directory Valid" } else { "Missing" });
+    println!("  [{}] macOS Keychain    : {}", if report.keyring_available { "PASS" } else { "WARNING" }, if report.keyring_available { "Available" } else { "Unavailable" });
+    println!("  [{}] Registered Accounts: {}", if report.registered_accounts_count > 0 { "PASS" } else { "WARNING" }, report.registered_accounts_count);
+    println!("  [{}] Mapped Projects   : {}", if report.mapped_projects_count > 0 { "PASS" } else { "WARNING" }, report.mapped_projects_count);
+
+    if !env_warnings.is_empty() {
+        println!("\n  [WARNING] Environment Overrides Detected:");
+        for w in env_warnings {
+            println!("    ⚠️  {}", w);
+        }
+    } else {
+        println!("  [PASS] Security Sandbox : No dangerous environment overrides detected.");
+    }
+    println!("===================================================\n");
     Ok(())
 }
 
@@ -453,7 +463,7 @@ async fn handle_clone(
     }
 
     let selected_acc = match account_opt {
-        Some(t) => accounts.into_iter().find(|a| a.id == t || a.github_username == t).ok_or_else(|| GitNestError::AccountNotFound(t))?,
+        Some(t) => accounts.into_iter().find(|a| a.id == t || a.github_username == t).ok_or(GitNestError::AccountNotFound(t))?,
         None => {
             // Check if current directory is already mapped to an account
             let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -494,7 +504,7 @@ async fn handle_clone(
     let exit_code = git_service.execute_ephemeral(&cwd, &selected_acc, &key_path, &clone_args)?;
     if exit_code == 0 {
         let cloned_path = target_dir.unwrap_or_else(|| {
-            let name = url.split('/').last().unwrap_or("repo").trim_end_matches(".git");
+            let name = url.split('/').next_back().unwrap_or("repo").trim_end_matches(".git");
             cwd.join(name)
         });
         project_service.map_project(&cloned_path, &selected_acc.id).await?;
@@ -522,6 +532,7 @@ async fn handle_clone(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_create(
     config_mgr: &ConfigManager,
     project_service: &ProjectService,
@@ -543,7 +554,7 @@ async fn handle_create(
         Some(t) => accounts
             .into_iter()
             .find(|a| a.id == t || a.github_username == t)
-            .ok_or_else(|| GitNestError::AccountNotFound(t))?,
+            .ok_or(GitNestError::AccountNotFound(t))?,
         None => {
             println!("Select GitHub Account to create repository under:");
             for (idx, acc) in accounts.iter().enumerate() {
@@ -578,7 +589,7 @@ async fn handle_create(
         selected_acc.github_username
     );
 
-    let mut ssh_url = match provider.create_repository(&token, name, private).await {
+    let ssh_url = match provider.create_repository(&token, name, private).await {
         Ok(url) => url,
         Err(_) => {
             println!("\nToken expired or missing permissions. Re-authenticating...\n");
@@ -755,6 +766,19 @@ async fn execute_ephemeral_git_cmd(
     let account = account_service.find_account(&project.account_id).await?.ok_or_else(|| GitNestError::AccountNotFound(project.account_id.clone()))?;
 
     let key_path = ssh_service.resolve_key_path(&account.key_id);
+
+    // 1. Sanitize environment overrides
+    crate::security::EnvGuard::validate_and_sanitize()?;
+
+    // 2. Validate Identity Alignment & Remote Owner
+    let remote_url = git_service.get_remote_url(&project.path);
+    crate::security::IdentityGuard::validate_operation(
+        &project.path,
+        &account,
+        &key_path,
+        remote_url.as_deref(),
+    )?;
+
     let mut command_args = vec![cmd_name];
     for a in extra_args {
         command_args.push(a.as_str());

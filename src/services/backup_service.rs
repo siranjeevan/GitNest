@@ -87,10 +87,11 @@ impl BackupService {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                if outpath.starts_with(self.config_mgr.ssh_dir()) && outpath.is_file() {
-                    if !outpath.to_string_lossy().ends_with(".pub") {
-                        std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(0o600))?;
-                    }
+                if outpath.starts_with(self.config_mgr.ssh_dir())
+                    && outpath.is_file()
+                    && !outpath.to_string_lossy().ends_with(".pub")
+                {
+                    std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(0o600))?;
                 }
             }
         }

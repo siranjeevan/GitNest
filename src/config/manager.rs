@@ -46,6 +46,10 @@ impl ConfigManager {
         self.root_dir.join("logs")
     }
 
+    pub fn installation_id_path(&self) -> PathBuf {
+        self.root_dir.join("installation_id")
+    }
+
     pub fn is_initialized(&self) -> bool {
         self.root_dir.exists() && self.config_path().exists()
     }
@@ -77,6 +81,12 @@ impl ConfigManager {
         let projects_path = self.projects_path();
         if !projects_path.exists() {
             fs::write(projects_path, r#"{"projects":[]}"#)?;
+        }
+
+        let inst_id_path = self.installation_id_path();
+        if !inst_id_path.exists() {
+            let inst_id = uuid::Uuid::new_v4().to_string();
+            fs::write(inst_id_path, inst_id)?;
         }
 
         Ok(())

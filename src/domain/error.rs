@@ -45,6 +45,15 @@ pub enum GitNestError {
     #[error("Git execution failed: {0}")]
     GitExecutionFailed(String),
 
+    #[error("Identity Mismatch: {0}")]
+    IdentityMismatch(String),
+
+    #[error("Remote Mismatch: {0}")]
+    RemoteMismatch(String),
+
+    #[error("Environment Override Blocked: {0}")]
+    EnvOverrideBlocked(String),
+
     #[error("Invalid path: {0}")]
     InvalidPath(String),
 }

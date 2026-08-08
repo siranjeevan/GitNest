@@ -5,6 +5,7 @@ pub mod domain;
 pub mod git;
 pub mod logger;
 pub mod providers;
+pub mod security;
 pub mod services;
 pub mod ssh;
 pub mod storage;

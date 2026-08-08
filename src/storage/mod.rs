@@ -1,4 +1,5 @@
 pub mod account_store;
+pub mod atomic;
 pub mod json_store;
 pub mod project_store;
 pub mod secure_store;

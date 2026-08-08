@@ -5,10 +5,16 @@ pub struct Config {
     pub version: String,
     pub log_level: String,
     pub default_ssh_key_type: String,
+    #[serde(default = "default_telemetry_enabled")]
+    pub telemetry_enabled: bool,
     #[serde(default)]
     pub git: GitSettings,
     #[serde(default)]
     pub github: GitHubSettings,
+}
+
+fn default_telemetry_enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +51,7 @@ impl Default for Config {
             version: "1.0".to_string(),
             log_level: "info".to_string(),
             default_ssh_key_type: "ed25519".to_string(),
+            telemetry_enabled: true,
             git: GitSettings::default(),
             github: GitHubSettings::default(),
         }

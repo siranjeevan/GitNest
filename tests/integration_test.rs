@@ -57,5 +57,8 @@ async fn test_revised_service_layer_lifecycle() {
     // Query project from deep nested dir
     let found_proj = project_service.find_project(&deep_nested_dir).await.unwrap().unwrap();
     assert_eq!(found_proj.account_id, acc.id);
-    assert_eq!(found_proj.path, root_proj_dir);
+    assert_eq!(
+        gitnest::utils::normalize_path(&found_proj.path),
+        gitnest::utils::normalize_path(&root_proj_dir)
+    );
 }

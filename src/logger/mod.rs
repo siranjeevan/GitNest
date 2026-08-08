@@ -24,7 +24,7 @@ pub fn init_logger(logs_dir: &Path, log_level: &str) -> Result<()> {
         .with(filter)
         .with(file_layer)
         .try_init()
-        .map_err(|e| GitNestError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        .map_err(|e| GitNestError::Io(std::io::Error::other(e)))?;
 
     Ok(())
 }
