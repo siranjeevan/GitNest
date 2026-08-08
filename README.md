@@ -109,10 +109,10 @@ OAuth access tokens are never saved to disk in plain text. They are stored secur
 ### Option 1: npm / npx (Global & Instant)
 ```bash
 # Global install via npm
-npm install -g gitnest
+npm install -g @siranjeevan/gitnest
 
 # Or run instantly via npx without installing
-npx gitnest
+npx @siranjeevan/gitnest
 ```
 
 ### Option 2: Quick Install Script (macOS & Linux)

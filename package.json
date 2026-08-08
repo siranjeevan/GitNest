@@ -1,5 +1,5 @@
 {
-  "name": "gitnest-cli",
+  "name": "@siranjeevan/gitnest",
   "version": "1.0.0",
   "description": "One Workspace. Multiple Git Identities.",
   "main": "bin/gitnest.js",
