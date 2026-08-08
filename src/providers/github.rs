@@ -227,10 +227,26 @@ impl GitProvider for GitHubProvider {
 
         if !res.status().is_success() {
             let err_text = res.text().await.unwrap_or_default();
-            return Err(GitNestError::OAuthError(format!(
-                "Failed to create repository on GitHub: {}",
+            let parsed_msg = if let Ok(val) = serde_json::from_str::<serde_json::Value>(&err_text) {
+                if let Some(errs) = val["errors"].as_array() {
+                    let msgs: Vec<String> = errs
+                        .iter()
+                        .filter_map(|e| e["message"].as_str().map(|s| s.to_string()))
+                        .collect();
+                    if !msgs.is_empty() {
+                        format!("Repository creation failed: {}", msgs.join(", "))
+                    } else {
+                        val["message"].as_str().unwrap_or(&err_text).to_string()
+                    }
+                } else if let Some(msg) = val["message"].as_str() {
+                    msg.to_string()
+                } else {
+                    err_text
+                }
+            } else {
                 err_text
-            )));
+            };
+            return Err(GitNestError::OAuthError(parsed_msg));
         }
 
         let body: serde_json::Value = res
