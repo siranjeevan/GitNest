@@ -83,22 +83,51 @@ impl GitService {
         }
     }
 
-    pub fn clone_repo(&self, repo_url: &str, target_dir: &Path, ssh_key_path: &Path) -> Result<std::path::PathBuf> {
-        let ssh_command = format!(
-            "ssh -i \"{}\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
-            ssh_key_path.to_string_lossy()
-        );
+    pub fn clone_repo(&self, repo_url: &str, target_dir: &Path, ssh_key_path: &Path, token: Option<&str>) -> Result<std::path::PathBuf> {
+        let mut cmd = Command::new("git");
+        cmd.arg("clone");
 
-        let output = Command::new("git")
-            .args(["clone", repo_url])
-            .current_dir(target_dir)
-            .env("GIT_SSH_COMMAND", ssh_command)
+        // If HTTPS URL and token is provided, embed token into URL for authentication
+        let auth_url = if repo_url.starts_with("https://") {
+            if let Some(t) = token {
+                let parts: Vec<&str> = repo_url.splitn(2, "https://").collect();
+                if parts.len() == 2 {
+                    format!("https://x-access-token:{}@{}", t, parts[1])
+                } else {
+                    repo_url.to_string()
+                }
+            } else {
+                repo_url.to_string()
+            }
+        } else {
+            repo_url.to_string()
+        };
+
+        cmd.arg(&auth_url);
+        cmd.current_dir(target_dir);
+
+        // If SSH URL or SSH key exists, pass GIT_SSH_COMMAND
+        if ssh_key_path.exists() {
+            let ssh_command = format!(
+                "ssh -i \"{}\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
+                ssh_key_path.to_string_lossy()
+            );
+            cmd.env("GIT_SSH_COMMAND", ssh_command);
+        }
+
+        let output = cmd
             .output()
             .map_err(|e| GitNestError::GitExecutionFailed(format!("Failed to spawn git clone: {}", e)))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(GitNestError::GitExecutionFailed(format!("git clone failed: {}", stderr.trim())));
+            // Sanitize token from stderr message if present
+            let sanitized_err = if let Some(t) = token {
+                stderr.replace(t, "********")
+            } else {
+                stderr.to_string()
+            };
+            return Err(GitNestError::GitExecutionFailed(format!("git clone failed: {}", sanitized_err.trim())));
         }
 
         // Extract folder name from URL (e.g., git@github.com:user/repo.git -> repo)

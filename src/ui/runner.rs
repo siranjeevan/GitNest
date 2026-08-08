@@ -257,7 +257,7 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                             if state.clone_repo_url.trim().is_empty() {
                                 state.set_notification("Repository URL cannot be empty", true);
                             } else if let Some(acc) = state.accounts.get(state.selected_clone_account_index).cloned() {
-                                let repo_url = state.clone_repo_url.trim().to_string();
+                                 let repo_url = state.clone_repo_url.trim().to_string();
                                 state.show_clone_repo_modal = false;
 
                                 let git_service = crate::services::GitService::new();
@@ -265,8 +265,11 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                 let ssh_service = SshService::new(config_mgr.ssh_dir());
                                 let key_path = ssh_service.resolve_key_path(&acc.key_id);
 
+                                let secure_store = KeyringSecureStore::new();
+                                let token = secure_store.get_token(&acc.github_username).ok().flatten();
+
                                 state.set_notification(format!("Cloning repository with @{}...", acc.github_username), false);
-                                match git_service.clone_repo(&repo_url, &cwd, &key_path) {
+                                match git_service.clone_repo(&repo_url, &cwd, &key_path, token.as_deref()) {
                                     Ok(cloned_path) => {
                                         // Auto-map cloned project to account
                                         if let Ok(proj) = project_service.map_project(&cloned_path, &acc.id).await {
