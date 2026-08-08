@@ -395,8 +395,11 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     continue;
                 }
 
-                // Direct Single-Key Jump Shortcuts (disabled in Palette & Accounts view for key conflicts)
-                if state.current_screen != Screen::CommandPalette && state.current_screen != Screen::Accounts {
+                // Direct Single-Key Jump Shortcuts (disabled when modal or text input active to avoid conflicts)
+                if state.current_screen != Screen::CommandPalette
+                    && state.current_screen != Screen::Accounts
+                    && !state.show_create_repo_modal
+                {
                     match key.code {
                         KeyCode::Char('?') => {
                             state.show_help_modal = true;
