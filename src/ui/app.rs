@@ -284,6 +284,59 @@ fn render_login_modal(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(p, popup_area);
 }
 
+fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 5,
+        area.height / 4,
+        (area.width * 3) / 5,
+        area.height / 2,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let folder_name = cwd.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "project".to_string());
+
+    let (acc_name, acc_email) = if let Some(ref acc) = state.active_account {
+        (acc.github_username.as_str(), acc.email.as_str())
+    } else if let Some(acc) = state.accounts.first() {
+        (acc.github_username.as_str(), acc.email.as_str())
+    } else {
+        ("No Account", "Login required")
+    };
+
+    let text = vec![
+        Line::from(Span::styled("CONNECT FOLDER TO GITHUB ACCOUNT", Theme::title())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Target Folder  : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(cwd.to_string_lossy(), Style::default().fg(Theme::CYAN)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Repository Name: ", Style::default().fg(Theme::MUTED)),
+            Span::styled(&folder_name, Style::default().fg(Theme::TEXT)),
+        ]),
+        Line::from(vec![
+            Span::styled("  Bind Identity  : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(format!("@{} ({})", acc_name, acc_email), Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD)),
+        ]),
+        Line::from(""),
+        Line::from("  This will map local git identity and SSH key pair exclusively"),
+        Line::from("  to this repository directory without affecting global git config."),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  [Enter] Confirm & Connect Folder     [Esc] Cancel", Theme::success_badge()),
+        ]),
+    ];
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" CONNECT FOLDER CONFIRMATION ")
+            .borders(Borders::ALL)
+            .border_style(Theme::border_active()),
+    );
+    f.render_widget(p, popup_area);
+}
+
 pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
@@ -321,6 +374,10 @@ pub fn render_app(f: &mut Frame, state: &AppState) {
 
     if state.show_login_modal {
         render_login_modal(f, state, size);
+    }
+
+    if state.show_connect_modal {
+        render_connect_modal(f, state, size);
     }
 
     if let Some(ref target_acc) = state.modal_switch_account {

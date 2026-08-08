@@ -54,6 +54,7 @@ pub struct AppState {
     pub modal_remove_account: Option<Account>,
     pub show_help_modal: bool,
     pub show_login_modal: bool,
+    pub show_connect_modal: bool,
     pub login_phase: LoginPhase,
     pub spinner_frame: usize,
     pub notification: Option<(String, bool)>, // (message, is_error)
@@ -79,6 +80,7 @@ impl AppState {
             modal_remove_account: None,
             show_help_modal: false,
             show_login_modal: false,
+            show_connect_modal: false,
             login_phase: LoginPhase::Ready,
             spinner_frame: 0,
             notification: None,
