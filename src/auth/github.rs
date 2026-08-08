@@ -172,7 +172,9 @@ impl GitHubOAuth {
         let primary = emails
             .into_iter()
             .find(|e| e.primary && e.verified)
-            .ok_or_else(|| GitNestError::OAuthError("No primary verified email found".to_string()))?;
+            .ok_or_else(|| {
+                GitNestError::OAuthError("No primary verified email found".to_string())
+            })?;
 
         Ok(primary.email)
     }

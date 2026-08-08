@@ -32,9 +32,9 @@ impl BackupService {
                 continue;
             }
 
-            let name = path
-                .strip_prefix(root_dir)
-                .map_err(|_| GitNestError::InvalidPath("Failed to strip path prefix".to_string()))?;
+            let name = path.strip_prefix(root_dir).map_err(|_| {
+                GitNestError::InvalidPath("Failed to strip path prefix".to_string())
+            })?;
 
             if path.is_file() {
                 zip.start_file(name.to_string_lossy(), options)?;
@@ -53,9 +53,8 @@ impl BackupService {
 
     pub fn import_backup(&self, input_zip_path: &Path) -> Result<()> {
         let file = File::open(input_zip_path)?;
-        let mut archive = ZipArchive::new(file).map_err(|e| {
-            GitNestError::InvalidPath(format!("Invalid zip archive: {}", e))
-        })?;
+        let mut archive = ZipArchive::new(file)
+            .map_err(|e| GitNestError::InvalidPath(format!("Invalid zip archive: {}", e)))?;
 
         let root_dir = self.config_mgr.root_dir();
         if !root_dir.exists() {
@@ -63,9 +62,9 @@ impl BackupService {
         }
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|e| {
-                GitNestError::InvalidPath(format!("Archive entry error: {}", e))
-            })?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| GitNestError::InvalidPath(format!("Archive entry error: {}", e)))?;
 
             let outpath = match file.enclosed_name() {
                 Some(path) => root_dir.join(path),

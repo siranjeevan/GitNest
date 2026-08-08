@@ -76,7 +76,9 @@ impl ProjectService {
             .filter_entry(|e| {
                 let fname = e.file_name().to_string_lossy();
                 // Skip hidden folders other than .git or node_modules/target
-                !(fname.starts_with('.') && fname != ".git") && fname != "node_modules" && fname != "target"
+                !(fname.starts_with('.') && fname != ".git")
+                    && fname != "node_modules"
+                    && fname != "target"
             })
             .filter_map(|e| e.ok())
         {

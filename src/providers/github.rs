@@ -238,9 +238,9 @@ impl GitProvider for GitHubProvider {
             .await
             .map_err(|e| GitNestError::OAuthError(e.to_string()))?;
 
-        let ssh_url = body["ssh_url"]
-            .as_str()
-            .ok_or_else(|| GitNestError::OAuthError("Missing ssh_url in GitHub response".to_string()))?;
+        let ssh_url = body["ssh_url"].as_str().ok_or_else(|| {
+            GitNestError::OAuthError("Missing ssh_url in GitHub response".to_string())
+        })?;
 
         Ok(ssh_url.to_string())
     }

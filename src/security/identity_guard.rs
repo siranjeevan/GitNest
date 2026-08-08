@@ -96,7 +96,10 @@ impl IdentityGuard {
         // 2. Validate Remote Owner alignment if remote URL is provided
         if let Some(url) = remote_url_opt {
             if let Some(remote_info) = RemoteInfo::parse_github_url(url) {
-                if !remote_info.owner.eq_ignore_ascii_case(&account.github_username) {
+                if !remote_info
+                    .owner
+                    .eq_ignore_ascii_case(&account.github_username)
+                {
                     return Err(GitNestError::IdentityMismatch(format!(
                         "BLOCKED: Identity Mismatch! Mapped account is '{}', but remote URL owner is '{}' (URL: {}).\n\
                         GitNest prevents pushing/pulling to mismatched GitHub owners to avoid identity leakage.",
@@ -121,7 +124,9 @@ impl IdentityGuard {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
             .unwrap_or_default();
 
-        if !local_username.is_empty() && !local_username.eq_ignore_ascii_case(&account.github_username) {
+        if !local_username.is_empty()
+            && !local_username.eq_ignore_ascii_case(&account.github_username)
+        {
             return Err(GitNestError::IdentityMismatch(format!(
                 "BLOCKED: Repository-local git user.name '{}' does not match mapped account '{}'.",
                 local_username, account.github_username
@@ -149,7 +154,8 @@ mod tests {
         assert_eq!(r1.owner, "siranjeevan");
         assert_eq!(r1.repository, "GitNest");
 
-        let r2 = RemoteInfo::parse_github_url("https://github.com/siranjeevanhope3/my-repo.git").unwrap();
+        let r2 = RemoteInfo::parse_github_url("https://github.com/siranjeevanhope3/my-repo.git")
+            .unwrap();
         assert_eq!(r2.owner, "siranjeevanhope3");
         assert_eq!(r2.repository, "my-repo");
 

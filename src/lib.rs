@@ -9,5 +9,5 @@ pub mod security;
 pub mod services;
 pub mod ssh;
 pub mod storage;
+pub mod ui;
 pub mod utils;
-

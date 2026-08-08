@@ -1,7 +1,7 @@
-use std::io::Write;
-use std::path::Path;
 use crate::domain::error::{GitNestError, Result};
 use serde::{de::DeserializeOwned, Serialize};
+use std::io::Write;
+use std::path::Path;
 
 pub fn read_json_file<T: DeserializeOwned>(path: &Path) -> Result<T> {
     if !path.exists() {
@@ -19,10 +19,10 @@ pub fn write_json_file_atomic<T: Serialize>(path: &Path, data: &T) -> Result<()>
 
     let mut temp_file = tempfile::NamedTempFile::new_in(parent)?;
     let json_bytes = serde_json::to_vec_pretty(data)?;
-    
+
     temp_file.write_all(&json_bytes)?;
     temp_file.as_file().sync_all()?;
-    
+
     temp_file.persist(path).map_err(|e| e.error)?;
 
     Ok(())

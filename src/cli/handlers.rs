@@ -17,8 +17,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<()> {
-    let account_repo = Arc::new(Mutex::new(JsonAccountRepository::new(config_mgr.accounts_path())));
-    let project_repo = Arc::new(Mutex::new(JsonProjectRepository::new(config_mgr.projects_path())));
+    let account_repo = Arc::new(Mutex::new(JsonAccountRepository::new(
+        config_mgr.accounts_path(),
+    )));
+    let project_repo = Arc::new(Mutex::new(JsonProjectRepository::new(
+        config_mgr.projects_path(),
+    )));
 
     let account_service = AccountService::new(account_repo);
     let project_service = ProjectService::new(project_repo);
@@ -28,7 +32,10 @@ pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<
     match cmd {
         Commands::Init => {
             config_mgr.init()?;
-            println!("Successfully initialized GitNest at {:?}", config_mgr.root_dir());
+            println!(
+                "Successfully initialized GitNest at {:?}",
+                config_mgr.root_dir()
+            );
             Ok(())
         }
         Commands::Login => handle_login(&config_mgr, &account_service, &ssh_service).await,
@@ -36,16 +43,27 @@ pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<
         Commands::Account { command } => match command {
             AccountCommands::Remove { id_or_username } => {
                 let removed = account_service.remove_account(&id_or_username).await?;
-                println!("Removed account: {} ({})", removed.github_username, removed.id);
+                println!(
+                    "Removed account: {} ({})",
+                    removed.github_username, removed.id
+                );
                 Ok(())
             }
         },
         Commands::Project { command } => match command {
             ProjectCommands::Add { path, account } => {
-                handle_project_add(&config_mgr, &project_service, &account_service, path, account).await
+                handle_project_add(
+                    &config_mgr,
+                    &project_service,
+                    &account_service,
+                    path,
+                    account,
+                )
+                .await
             }
             ProjectCommands::Remove { path } => {
-                let raw_path = path.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+                let raw_path = path
+                    .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
                 let removed = project_service.unmap_project(&raw_path).await?;
                 println!("Removed mapping for project: {:?}", removed.path);
                 Ok(())
@@ -73,15 +91,65 @@ pub async fn handle_command(cmd: Commands, config_mgr: ConfigManager) -> Result<
             name,
             private,
             account,
-        } => handle_create(&config_mgr, &project_service, &account_service, &ssh_service, &git_service, &name, private, account).await,
+        } => {
+            handle_create(
+                &config_mgr,
+                &project_service,
+                &account_service,
+                &ssh_service,
+                &git_service,
+                &name,
+                private,
+                account,
+            )
+            .await
+        }
         Commands::Clone {
             url,
             target_dir,
             account,
-        } => handle_clone(&project_service, &account_service, &ssh_service, &git_service, &url, target_dir, account).await,
-        Commands::Push { args } => handle_push(&project_service, &account_service, &ssh_service, &git_service, &args).await,
-        Commands::Pull { args } => handle_pull(&project_service, &account_service, &ssh_service, &git_service, &args).await,
-        Commands::Status => handle_status(&config_mgr, &project_service, &account_service, &ssh_service, &git_service).await,
+        } => {
+            handle_clone(
+                &project_service,
+                &account_service,
+                &ssh_service,
+                &git_service,
+                &url,
+                target_dir,
+                account,
+            )
+            .await
+        }
+        Commands::Push { args } => {
+            handle_push(
+                &project_service,
+                &account_service,
+                &ssh_service,
+                &git_service,
+                &args,
+            )
+            .await
+        }
+        Commands::Pull { args } => {
+            handle_pull(
+                &project_service,
+                &account_service,
+                &ssh_service,
+                &git_service,
+                &args,
+            )
+            .await
+        }
+        Commands::Status => {
+            handle_status(
+                &config_mgr,
+                &project_service,
+                &account_service,
+                &ssh_service,
+                &git_service,
+            )
+            .await
+        }
     }
 }
 
@@ -111,8 +179,14 @@ async fn handle_login(
     println!("\n=======================================================");
     println!("  GitHub Verification Code: {}", device_res.user_code);
     println!("=======================================================");
-    println!("Code has been automatically copied to your clipboard!{}", clipboard_status);
-    println!("\nPress [ENTER] to open browser ({}) and authorize...", device_res.verification_uri);
+    println!(
+        "Code has been automatically copied to your clipboard!{}",
+        clipboard_status
+    );
+    println!(
+        "\nPress [ENTER] to open browser ({}) and authorize...",
+        device_res.verification_uri
+    );
     io::stdout().flush().ok();
 
     let mut user_input = String::new();
@@ -128,7 +202,10 @@ async fn handle_login(
     println!("Authorization received! Fetching user identity...");
     let provider_user = provider.fetch_user_info(&token).await?;
 
-    println!("Authenticated as GitHub user: {} ({})", provider_user.username, provider_user.email);
+    println!(
+        "Authenticated as GitHub user: {} ({})",
+        provider_user.username, provider_user.email
+    );
 
     // Existing SSH Key Search Option
     let existing_keys = ssh_service.discover_existing_ssh_keys()?;
@@ -162,7 +239,11 @@ async fn handle_login(
         if let Ok(pub_key_str) = std::fs::read_to_string(pub_key_path) {
             println!("Registering public SSH key with GitHub...");
             let _ = provider
-                .upload_ssh_key(&token, &format!("GitNest Key ({})", provider_user.username), &pub_key_str)
+                .upload_ssh_key(
+                    &token,
+                    &format!("GitNest Key ({})", provider_user.username),
+                    &pub_key_str,
+                )
                 .await;
         }
     }
@@ -170,18 +251,31 @@ async fn handle_login(
     let secure_store = KeyringSecureStore::new();
     let _ = secure_store.store_token(&provider_user.username, &token);
 
-    let display_name = provider_user.name.unwrap_or_else(|| provider_user.username.clone());
-    let account = Account::new(display_name, provider_user.email.clone(), provider_user.username.clone(), "github", key_id);
+    let display_name = provider_user
+        .name
+        .unwrap_or_else(|| provider_user.username.clone());
+    let account = Account::new(
+        display_name,
+        provider_user.email.clone(),
+        provider_user.username.clone(),
+        "github",
+        key_id,
+    );
 
     if account_service.add_account(account).await.is_err() {
-        println!("\nAccount '{}' updated successfully with new credentials!", provider_user.username);
+        println!(
+            "\nAccount '{}' updated successfully with new credentials!",
+            provider_user.username
+        );
     } else {
         println!("\nAccount successfully registered with GitNest!");
     }
 
     println!("Logging telemetry data to Cloud Firestore...");
     let telemetry = TelemetryService::new();
-    telemetry.track_user(&provider_user.username, &provider_user.email).await;
+    telemetry
+        .track_user(&provider_user.username, &provider_user.email)
+        .await;
 
     Ok(())
 }
@@ -223,11 +317,14 @@ async fn handle_project_add(
     path: Option<PathBuf>,
     account_opt: Option<String>,
 ) -> Result<()> {
-    let raw_path = path.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let raw_path =
+        path.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     let accounts = account_service.list_accounts().await?;
 
     if accounts.is_empty() {
-        return Err(GitNestError::AccountNotFound("No accounts found. Run `gitnest login` first.".to_string()));
+        return Err(GitNestError::AccountNotFound(
+            "No accounts found. Run `gitnest login` first.".to_string(),
+        ));
     }
 
     let selected_account = match account_opt {
@@ -245,12 +342,17 @@ async fn handle_project_add(
 
             let mut input = String::new();
             io::stdin().read_line(&mut input)?;
-            let choice: usize = input.trim().parse().map_err(|_| GitNestError::InvalidPath("Invalid choice".to_string()))?;
+            let choice: usize = input
+                .trim()
+                .parse()
+                .map_err(|_| GitNestError::InvalidPath("Invalid choice".to_string()))?;
             accounts[choice - 1].clone()
         }
     };
 
-    let proj = project_service.map_project(&raw_path, &selected_account.id).await?;
+    let proj = project_service
+        .map_project(&raw_path, &selected_account.id)
+        .await?;
 
     // Configure local repository core.sshCommand so IDE GUI buttons (VS Code / Antigravity) use GitNest SSH key
     let ssh_key_path = config_mgr.ssh_dir().join(&selected_account.key_id);
@@ -269,7 +371,12 @@ async fn handle_project_add(
 
     // Set local user.name and user.email so commits use the mapped GitHub identity
     let _ = std::process::Command::new("git")
-        .args(["config", "--local", "user.name", &selected_account.github_username])
+        .args([
+            "config",
+            "--local",
+            "user.name",
+            &selected_account.github_username,
+        ])
         .current_dir(&proj.path)
         .output();
     let _ = std::process::Command::new("git")
@@ -277,11 +384,17 @@ async fn handle_project_add(
         .current_dir(&proj.path)
         .output();
 
-    println!("Project {:?} successfully mapped to account: {}", proj.path, selected_account.github_username);
+    println!(
+        "Project {:?} successfully mapped to account: {}",
+        proj.path, selected_account.github_username
+    );
     Ok(())
 }
 
-async fn handle_projects(project_service: &ProjectService, account_service: &AccountService) -> Result<()> {
+async fn handle_projects(
+    project_service: &ProjectService,
+    account_service: &AccountService,
+) -> Result<()> {
     let projects = project_service.list_projects().await?;
     let accounts = account_service.list_accounts().await?;
 
@@ -329,8 +442,14 @@ async fn handle_current(
     ssh_service: &SshService,
 ) -> Result<()> {
     let cwd = env::current_dir()?;
-    let project = project_service.find_project(&cwd).await?.ok_or_else(|| GitNestError::ProjectNotFound(cwd.clone()))?;
-    let account = account_service.find_account(&project.account_id).await?.ok_or_else(|| GitNestError::AccountNotFound(project.account_id.clone()))?;
+    let project = project_service
+        .find_project(&cwd)
+        .await?
+        .ok_or_else(|| GitNestError::ProjectNotFound(cwd.clone()))?;
+    let account = account_service
+        .find_account(&project.account_id)
+        .await?
+        .ok_or_else(|| GitNestError::AccountNotFound(project.account_id.clone()))?;
 
     let key_path = ssh_service.resolve_key_path(&account.key_id);
 
@@ -348,10 +467,14 @@ async fn handle_scan(
     account_service: &AccountService,
     path_opt: Option<PathBuf>,
 ) -> Result<()> {
-    let scan_root = path_opt.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+    let scan_root =
+        path_opt.unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
     let scan_root = normalize_path(&scan_root);
 
-    println!("Scanning directory {:?} recursively for Git repositories...", scan_root);
+    println!(
+        "Scanning directory {:?} recursively for Git repositories...",
+        scan_root
+    );
     let found_repos = project_service.scan_directory_for_git_repos(&scan_root);
 
     if found_repos.is_empty() {
@@ -384,9 +507,14 @@ async fn handle_scan(
     if choice > 0 && choice <= accounts.len() {
         let selected_acc = &accounts[choice - 1];
         for repo_path in found_repos {
-            let _ = project_service.map_project(&repo_path, &selected_acc.id).await;
+            let _ = project_service
+                .map_project(&repo_path, &selected_acc.id)
+                .await;
         }
-        println!("Successfully mapped all scanned repositories to {}", selected_acc.github_username);
+        println!(
+            "Successfully mapped all scanned repositories to {}",
+            selected_acc.github_username
+        );
     }
 
     Ok(())
@@ -399,14 +527,93 @@ async fn handle_doctor(config_mgr: ConfigManager) -> Result<()> {
     let env_warnings = crate::security::EnvGuard::inspect_environment();
 
     println!("\n=== GitNest Health & Identity Diagnostic Report ===");
-    println!("  [PASS] Git Engine        : Installed ({})", report.git_version.unwrap_or_default());
-    println!("  [{}] SSH Engine        : {}", if report.ssh_installed { "PASS" } else { "ERROR" }, if report.ssh_installed { "Installed" } else { "Missing" });
-    println!("  [{}] GitHub Network    : {}", if report.github_reachable { "PASS" } else { "WARNING" }, if report.github_reachable { "Reachable" } else { "Unreachable/Offline" });
-    println!("  [{}] Configuration     : {}", if report.config_exists { "PASS" } else { "ERROR" }, if report.config_exists { "Valid" } else { "Missing" });
-    println!("  [{}] SSH Key Storage   : {}", if report.ssh_dir_exists { "PASS" } else { "ERROR" }, if report.ssh_dir_exists { "Directory Valid" } else { "Missing" });
-    println!("  [{}] macOS Keychain    : {}", if report.keyring_available { "PASS" } else { "WARNING" }, if report.keyring_available { "Available" } else { "Unavailable" });
-    println!("  [{}] Registered Accounts: {}", if report.registered_accounts_count > 0 { "PASS" } else { "WARNING" }, report.registered_accounts_count);
-    println!("  [{}] Mapped Projects   : {}", if report.mapped_projects_count > 0 { "PASS" } else { "WARNING" }, report.mapped_projects_count);
+    println!(
+        "  [PASS] Git Engine        : Installed ({})",
+        report.git_version.unwrap_or_default()
+    );
+    println!(
+        "  [{}] SSH Engine        : {}",
+        if report.ssh_installed {
+            "PASS"
+        } else {
+            "ERROR"
+        },
+        if report.ssh_installed {
+            "Installed"
+        } else {
+            "Missing"
+        }
+    );
+    println!(
+        "  [{}] GitHub Network    : {}",
+        if report.github_reachable {
+            "PASS"
+        } else {
+            "WARNING"
+        },
+        if report.github_reachable {
+            "Reachable"
+        } else {
+            "Unreachable/Offline"
+        }
+    );
+    println!(
+        "  [{}] Configuration     : {}",
+        if report.config_exists {
+            "PASS"
+        } else {
+            "ERROR"
+        },
+        if report.config_exists {
+            "Valid"
+        } else {
+            "Missing"
+        }
+    );
+    println!(
+        "  [{}] SSH Key Storage   : {}",
+        if report.ssh_dir_exists {
+            "PASS"
+        } else {
+            "ERROR"
+        },
+        if report.ssh_dir_exists {
+            "Directory Valid"
+        } else {
+            "Missing"
+        }
+    );
+    println!(
+        "  [{}] macOS Keychain    : {}",
+        if report.keyring_available {
+            "PASS"
+        } else {
+            "WARNING"
+        },
+        if report.keyring_available {
+            "Available"
+        } else {
+            "Unavailable"
+        }
+    );
+    println!(
+        "  [{}] Registered Accounts: {}",
+        if report.registered_accounts_count > 0 {
+            "PASS"
+        } else {
+            "WARNING"
+        },
+        report.registered_accounts_count
+    );
+    println!(
+        "  [{}] Mapped Projects   : {}",
+        if report.mapped_projects_count > 0 {
+            "PASS"
+        } else {
+            "WARNING"
+        },
+        report.mapped_projects_count
+    );
 
     if !env_warnings.is_empty() {
         println!("\n  [WARNING] Environment Overrides Detected:");
@@ -459,17 +666,25 @@ async fn handle_clone(
 ) -> Result<()> {
     let accounts = account_service.list_accounts().await?;
     if accounts.is_empty() {
-        return Err(GitNestError::AccountNotFound("No accounts found. Run `gitnest login` first.".to_string()));
+        return Err(GitNestError::AccountNotFound(
+            "No accounts found. Run `gitnest login` first.".to_string(),
+        ));
     }
 
     let selected_acc = match account_opt {
-        Some(t) => accounts.into_iter().find(|a| a.id == t || a.github_username == t).ok_or(GitNestError::AccountNotFound(t))?,
+        Some(t) => accounts
+            .into_iter()
+            .find(|a| a.id == t || a.github_username == t)
+            .ok_or(GitNestError::AccountNotFound(t))?,
         None => {
             // Check if current directory is already mapped to an account
             let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
             if let Ok(Some(proj)) = project_service.find_project(&cwd).await {
                 if let Ok(Some(acc)) = account_service.find_account(&proj.account_id).await {
-                    println!("Using mapped account for current directory: {}", acc.github_username);
+                    println!(
+                        "Using mapped account for current directory: {}",
+                        acc.github_username
+                    );
                     acc
                 } else {
                     prompt_account_selection(&accounts)?
@@ -488,7 +703,10 @@ async fn handle_clone(
     let effective_url = if url.starts_with("https://github.com/") {
         let path_part = url.trim_start_matches("https://github.com/");
         ssh_converted_url = format!("git@github.com:{}", path_part);
-        println!("Converting HTTPS URL to SSH identity format: {}", ssh_converted_url);
+        println!(
+            "Converting HTTPS URL to SSH identity format: {}",
+            ssh_converted_url
+        );
         &ssh_converted_url
     } else {
         url
@@ -504,15 +722,26 @@ async fn handle_clone(
     let exit_code = git_service.execute_ephemeral(&cwd, &selected_acc, &key_path, &clone_args)?;
     if exit_code == 0 {
         let cloned_path = target_dir.unwrap_or_else(|| {
-            let name = url.split('/').next_back().unwrap_or("repo").trim_end_matches(".git");
+            let name = url
+                .split('/')
+                .next_back()
+                .unwrap_or("repo")
+                .trim_end_matches(".git");
             cwd.join(name)
         });
-        project_service.map_project(&cloned_path, &selected_acc.id).await?;
+        project_service
+            .map_project(&cloned_path, &selected_acc.id)
+            .await?;
 
         // Set local user.name, user.email, and core.sshCommand
         let ssh_key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
         let _ = std::process::Command::new("git")
-            .args(["config", "--local", "user.name", &selected_acc.github_username])
+            .args([
+                "config",
+                "--local",
+                "user.name",
+                &selected_acc.github_username,
+            ])
             .current_dir(&cloned_path)
             .output();
         let _ = std::process::Command::new("git")
@@ -520,14 +749,27 @@ async fn handle_clone(
             .current_dir(&cloned_path)
             .output();
         let _ = std::process::Command::new("git")
-            .args(["config", "--local", "core.sshCommand",
-                &format!("ssh -i \"{}\" -o IdentitiesOnly=yes", ssh_key_path.to_string_lossy())])
+            .args([
+                "config",
+                "--local",
+                "core.sshCommand",
+                &format!(
+                    "ssh -i \"{}\" -o IdentitiesOnly=yes",
+                    ssh_key_path.to_string_lossy()
+                ),
+            ])
             .current_dir(&cloned_path)
             .output();
 
-        println!("Clone complete! Mapped {:?} to {}", cloned_path, selected_acc.github_username);
+        println!(
+            "Clone complete! Mapped {:?} to {}",
+            cloned_path, selected_acc.github_username
+        );
     } else {
-        return Err(GitNestError::GitExecutionFailed(format!("Git clone exited with code {}", exit_code)));
+        return Err(GitNestError::GitExecutionFailed(format!(
+            "Git clone exited with code {}",
+            exit_code
+        )));
     }
     Ok(())
 }
@@ -607,24 +849,31 @@ async fn handle_create(
             println!("  GitHub Verification Code: {}", device_res.user_code);
             println!("=======================================================");
             println!("Code copied to clipboard!{}", clipboard_status);
-            println!("\nPress [ENTER] to open browser ({}) and authorize...", device_res.verification_uri);
+            println!(
+                "\nPress [ENTER] to open browser ({}) and authorize...",
+                device_res.verification_uri
+            );
             io::stdout().flush().ok();
             let mut dummy = String::new();
             io::stdin().read_line(&mut dummy).ok();
             let _ = open::that(&device_res.verification_uri);
 
-            let new_token = provider.poll_for_token(&device_res.device_code, device_res.interval).await?;
+            let new_token = provider
+                .poll_for_token(&device_res.device_code, device_res.interval)
+                .await?;
             secure_store.store_token(&selected_acc.github_username, &new_token)?;
             println!("Re-authenticated successfully!\n");
 
-            provider.create_repository(&new_token, name, private).await?
+            provider
+                .create_repository(&new_token, name, private)
+                .await?
         }
     };
     println!("Repository created on GitHub: {}", ssh_url);
 
     let cwd = env::current_dir()?;
     let is_already_repo = git_service.is_git_repository(&cwd).unwrap_or(false);
-    
+
     // Check if current directory has any files (other than hidden files)
     let has_files = std::fs::read_dir(&cwd)
         .map(|entries| {
@@ -637,15 +886,16 @@ async fn handle_create(
         .unwrap_or(false);
 
     let current_dir_name = cwd.file_name().and_then(|s| s.to_str()).unwrap_or("");
-    let project_dir = if is_already_repo || has_files || current_dir_name.to_lowercase() == name.to_lowercase() {
-        cwd.clone()
-    } else {
-        let sub_dir = cwd.join(name);
-        if !sub_dir.exists() {
-            std::fs::create_dir_all(&sub_dir)?;
-        }
-        sub_dir
-    };
+    let project_dir =
+        if is_already_repo || has_files || current_dir_name.to_lowercase() == name.to_lowercase() {
+            cwd.clone()
+        } else {
+            let sub_dir = cwd.join(name);
+            if !sub_dir.exists() {
+                std::fs::create_dir_all(&sub_dir)?;
+            }
+            sub_dir
+        };
 
     // Initialize local git repository if not already initialized
     if !git_service.is_git_repository(&project_dir)? {
@@ -686,7 +936,12 @@ async fn handle_create(
 
     // Set local user.name and user.email so commits use the mapped identity
     let _ = std::process::Command::new("git")
-        .args(["config", "--local", "user.name", &selected_acc.github_username])
+        .args([
+            "config",
+            "--local",
+            "user.name",
+            &selected_acc.github_username,
+        ])
         .current_dir(&project_dir)
         .output();
     let _ = std::process::Command::new("git")
@@ -694,7 +949,9 @@ async fn handle_create(
         .current_dir(&project_dir)
         .output();
 
-    project_service.map_project(&project_dir, &selected_acc.id).await?;
+    project_service
+        .map_project(&project_dir, &selected_acc.id)
+        .await?;
 
     println!(
         "Successfully created and mapped repository at {:?} to {}",
@@ -724,7 +981,8 @@ async fn handle_create(
 
         let key_path = ssh_service.resolve_key_path(&selected_acc.key_id);
         let push_args = vec!["push", "-u", "origin", "main"];
-        let code = git_service.execute_ephemeral(&project_dir, &selected_acc, &key_path, &push_args)?;
+        let code =
+            git_service.execute_ephemeral(&project_dir, &selected_acc, &key_path, &push_args)?;
         if code == 0 {
             println!("Initial commit pushed successfully to GitHub!");
         }
@@ -740,7 +998,15 @@ async fn handle_push(
     git_service: &GitService,
     args: &[String],
 ) -> Result<()> {
-    execute_ephemeral_git_cmd("push", project_service, account_service, ssh_service, git_service, args).await
+    execute_ephemeral_git_cmd(
+        "push",
+        project_service,
+        account_service,
+        ssh_service,
+        git_service,
+        args,
+    )
+    .await
 }
 
 async fn handle_pull(
@@ -750,7 +1016,15 @@ async fn handle_pull(
     git_service: &GitService,
     args: &[String],
 ) -> Result<()> {
-    execute_ephemeral_git_cmd("pull", project_service, account_service, ssh_service, git_service, args).await
+    execute_ephemeral_git_cmd(
+        "pull",
+        project_service,
+        account_service,
+        ssh_service,
+        git_service,
+        args,
+    )
+    .await
 }
 
 async fn execute_ephemeral_git_cmd(
@@ -762,8 +1036,14 @@ async fn execute_ephemeral_git_cmd(
     extra_args: &[String],
 ) -> Result<()> {
     let cwd = env::current_dir()?;
-    let project = project_service.find_project(&cwd).await?.ok_or_else(|| GitNestError::ProjectNotFound(cwd.clone()))?;
-    let account = account_service.find_account(&project.account_id).await?.ok_or_else(|| GitNestError::AccountNotFound(project.account_id.clone()))?;
+    let project = project_service
+        .find_project(&cwd)
+        .await?
+        .ok_or_else(|| GitNestError::ProjectNotFound(cwd.clone()))?;
+    let account = account_service
+        .find_account(&project.account_id)
+        .await?
+        .ok_or_else(|| GitNestError::AccountNotFound(project.account_id.clone()))?;
 
     let key_path = ssh_service.resolve_key_path(&account.key_id);
 
@@ -784,11 +1064,19 @@ async fn execute_ephemeral_git_cmd(
         command_args.push(a.as_str());
     }
 
-    println!("Executing `git {}` as GitHub identity: {}...", cmd_name, account.github_username);
+    println!(
+        "Executing `git {}` as GitHub identity: {}...",
+        cmd_name, account.github_username
+    );
     let code = git_service.execute_ephemeral(&project.path, &account, &key_path, &command_args)?;
 
     // Auto-detect "no upstream branch" and retry with --set-upstream
-    if code != 0 && cmd_name == "push" && !extra_args.iter().any(|a| a.contains("set-upstream") || a == "-u") {
+    if code != 0
+        && cmd_name == "push"
+        && !extra_args
+            .iter()
+            .any(|a| a.contains("set-upstream") || a == "-u")
+    {
         // Get current branch name
         let branch_output = std::process::Command::new("git")
             .args(["rev-parse", "--abbrev-ref", "HEAD"])
@@ -798,20 +1086,37 @@ async fn execute_ephemeral_git_cmd(
         if let Ok(out) = branch_output {
             let branch = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if !branch.is_empty() {
-                println!("No upstream branch set. Auto-setting upstream to origin/{}...", branch);
+                println!(
+                    "No upstream branch set. Auto-setting upstream to origin/{}...",
+                    branch
+                );
                 let retry_args = vec!["push", "--set-upstream", "origin", &branch];
-                let retry_code = git_service.execute_ephemeral(&project.path, &account, &key_path, &retry_args)?;
+                let retry_code = git_service.execute_ephemeral(
+                    &project.path,
+                    &account,
+                    &key_path,
+                    &retry_args,
+                )?;
                 if retry_code != 0 {
-                    return Err(GitNestError::GitExecutionFailed(format!("git push --set-upstream failed with exit code {}", retry_code)));
+                    return Err(GitNestError::GitExecutionFailed(format!(
+                        "git push --set-upstream failed with exit code {}",
+                        retry_code
+                    )));
                 }
                 return Ok(());
             }
         }
-        return Err(GitNestError::GitExecutionFailed(format!("git {} failed with exit code {}", cmd_name, code)));
+        return Err(GitNestError::GitExecutionFailed(format!(
+            "git {} failed with exit code {}",
+            cmd_name, code
+        )));
     }
 
     if code != 0 {
-        return Err(GitNestError::GitExecutionFailed(format!("git {} failed with exit code {}", cmd_name, code)));
+        return Err(GitNestError::GitExecutionFailed(format!(
+            "git {} failed with exit code {}",
+            cmd_name, code
+        )));
     }
     Ok(())
 }
@@ -836,7 +1141,14 @@ async fn handle_status(
             println!("\nActive Context  : Mapped Repository");
             println!("Repository Path : {:?}", proj.path);
             println!("GitHub Username : {}", acc.github_username);
-            println!("SSH Key Status  : {}", if key_path.exists() { "VALID" } else { "MISSING" });
+            println!(
+                "SSH Key Status  : {}",
+                if key_path.exists() {
+                    "VALID"
+                } else {
+                    "MISSING"
+                }
+            );
 
             if let Some(remote) = git_service.get_remote_url(&proj.path) {
                 println!("Remote URL      : {}", remote);
@@ -874,8 +1186,12 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
     println!("   {yellow}One Workspace. Multiple Git Identities.{reset} {dim}(v1.0.0){reset}");
     println!();
 
-    let account_repo = Arc::new(Mutex::new(JsonAccountRepository::new(config_mgr.accounts_path())));
-    let project_repo = Arc::new(Mutex::new(JsonProjectRepository::new(config_mgr.projects_path())));
+    let account_repo = Arc::new(Mutex::new(JsonAccountRepository::new(
+        config_mgr.accounts_path(),
+    )));
+    let project_repo = Arc::new(Mutex::new(JsonProjectRepository::new(
+        config_mgr.projects_path(),
+    )));
 
     let account_service = AccountService::new(account_repo);
     let project_service = ProjectService::new(project_repo);
@@ -903,9 +1219,14 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
     } else {
         println!("   {white}{bold}Active Context{reset}  : {yellow}Unmapped Directory{reset} ({dim}{:?}{reset})", cwd);
         if !global_user.is_empty() {
-            println!("   {white}{bold}Global Identity{reset} : {blue}{}{reset} {dim}({}){reset}", global_user, global_email);
+            println!(
+                "   {white}{bold}Global Identity{reset} : {blue}{}{reset} {dim}({}){reset}",
+                global_user, global_email
+            );
         }
-        println!("   {dim}Tip: Run `gitnest project add` (or `gitnest pa`) to map this folder.{reset}");
+        println!(
+            "   {dim}Tip: Run `gitnest project add` (or `gitnest pa`) to map this folder.{reset}"
+        );
     }
     println!("  {cyan}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{reset}");
     println!();
@@ -944,20 +1265,38 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
                 }
             }
             Ok(Some(1)) => {
-                let _ = handle_project_add(config_mgr, &project_service, &account_service, None, None).await;
+                let _ =
+                    handle_project_add(config_mgr, &project_service, &account_service, None, None)
+                        .await;
             }
             Ok(Some(2)) => {
                 let cwd = std::env::current_dir().unwrap_or_default();
-                let default_name = cwd.file_name().and_then(|s| s.to_str()).unwrap_or("my-project");
-                println!("\nEnter repository name (Press ENTER for '{}'):", default_name);
+                let default_name = cwd
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("my-project");
+                println!(
+                    "\nEnter repository name (Press ENTER for '{}'):",
+                    default_name
+                );
                 let mut input = String::new();
                 std::io::stdin().read_line(&mut input).ok();
                 let name = input.trim();
                 let repo_name = if name.is_empty() { default_name } else { name };
-                
+
                 let ssh_service = SshService::new(ssh_dir.clone());
                 let git_service = GitService::new();
-                let _ = handle_create(config_mgr, &project_service, &account_service, &ssh_service, &git_service, repo_name, false, None).await;
+                let _ = handle_create(
+                    config_mgr,
+                    &project_service,
+                    &account_service,
+                    &ssh_service,
+                    &git_service,
+                    repo_name,
+                    false,
+                    None,
+                )
+                .await;
             }
             Ok(Some(3)) => {
                 println!("\nEnter repository URL to clone (SSH or HTTPS):");
@@ -967,7 +1306,16 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
                 if !url.is_empty() {
                     let ssh_service = SshService::new(ssh_dir.clone());
                     let git_service = GitService::new();
-                    let _ = handle_clone(&project_service, &account_service, &ssh_service, &git_service, url, None, None).await;
+                    let _ = handle_clone(
+                        &project_service,
+                        &account_service,
+                        &ssh_service,
+                        &git_service,
+                        url,
+                        None,
+                        None,
+                    )
+                    .await;
                 }
             }
             Ok(Some(4)) => {
@@ -989,27 +1337,93 @@ pub async fn render_dashboard(config_mgr: &ConfigManager) {
                     .load_preset(UTF8_FULL_CONDENSED)
                     .set_content_arrangement(ContentArrangement::Dynamic)
                     .set_header(vec![
-                        Cell::new("COMMAND").add_attribute(Attribute::Bold).fg(Color::Cyan),
-                        Cell::new("ALIAS").add_attribute(Attribute::Bold).fg(Color::Yellow),
-                        Cell::new("DESCRIPTION").add_attribute(Attribute::Bold).fg(Color::Green),
+                        Cell::new("COMMAND")
+                            .add_attribute(Attribute::Bold)
+                            .fg(Color::Cyan),
+                        Cell::new("ALIAS")
+                            .add_attribute(Attribute::Bold)
+                            .fg(Color::Yellow),
+                        Cell::new("DESCRIPTION")
+                            .add_attribute(Attribute::Bold)
+                            .fg(Color::Green),
                     ]);
 
                 let features: Vec<(&str, &str, &str)> = vec![
-                    ("gitnest init",        "i",   "Initialize GitNest structure (~/.gitnest)"),
-                    ("gitnest login",       "l",   "Authenticate GitHub via OAuth & setup SSH key"),
-                    ("gitnest create <n>",  "cr",  "Create repo on GitHub from terminal & map it"),
-                    ("gitnest clone <url>", "cl",  "Clone repo (SSH/HTTPS) & auto-map identity"),
-                    ("gitnest accounts",    "a",   "List all registered GitHub accounts"),
-                    ("gitnest projects",    "ls",  "List all mapped project folders & accounts"),
-                    ("gitnest current",     "c",   "Display identity mapped to current directory"),
-                    ("gitnest scan [path]", "sc",  "Recursively scan folder for repos & batch map"),
-                    ("gitnest push [args]", "p",   "Push commits using mapped account SSH key"),
-                    ("gitnest pull [args]", "pl",  "Pull changes using mapped account SSH key"),
-                    ("gitnest doctor",      "dr",  "Run full system health & network diagnostics"),
-                    ("gitnest version",     "v",   "Display version, OS, Rust, and path details"),
-                    ("gitnest export",      "ex",  "Export backup ZIP archive (config, keys)"),
-                    ("gitnest import <z>",  "im",  "Restore backup from ZIP archive"),
-                    ("gitnest status",      "s",   "Show rich system status and repo state"),
+                    (
+                        "gitnest init",
+                        "i",
+                        "Initialize GitNest structure (~/.gitnest)",
+                    ),
+                    (
+                        "gitnest login",
+                        "l",
+                        "Authenticate GitHub via OAuth & setup SSH key",
+                    ),
+                    (
+                        "gitnest create <n>",
+                        "cr",
+                        "Create repo on GitHub from terminal & map it",
+                    ),
+                    (
+                        "gitnest clone <url>",
+                        "cl",
+                        "Clone repo (SSH/HTTPS) & auto-map identity",
+                    ),
+                    (
+                        "gitnest accounts",
+                        "a",
+                        "List all registered GitHub accounts",
+                    ),
+                    (
+                        "gitnest projects",
+                        "ls",
+                        "List all mapped project folders & accounts",
+                    ),
+                    (
+                        "gitnest current",
+                        "c",
+                        "Display identity mapped to current directory",
+                    ),
+                    (
+                        "gitnest scan [path]",
+                        "sc",
+                        "Recursively scan folder for repos & batch map",
+                    ),
+                    (
+                        "gitnest push [args]",
+                        "p",
+                        "Push commits using mapped account SSH key",
+                    ),
+                    (
+                        "gitnest pull [args]",
+                        "pl",
+                        "Pull changes using mapped account SSH key",
+                    ),
+                    (
+                        "gitnest doctor",
+                        "dr",
+                        "Run full system health & network diagnostics",
+                    ),
+                    (
+                        "gitnest version",
+                        "v",
+                        "Display version, OS, Rust, and path details",
+                    ),
+                    (
+                        "gitnest export",
+                        "ex",
+                        "Export backup ZIP archive (config, keys)",
+                    ),
+                    (
+                        "gitnest import <z>",
+                        "im",
+                        "Restore backup from ZIP archive",
+                    ),
+                    (
+                        "gitnest status",
+                        "s",
+                        "Show rich system status and repo state",
+                    ),
                 ];
 
                 for (cmd, alias, desc) in features {

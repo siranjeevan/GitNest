@@ -10,7 +10,8 @@ fn test_remote_url_parsing_all_formats() {
     assert_eq!(r1.owner, "siranjeevan");
     assert_eq!(r1.repository, "GitNest");
 
-    let r2 = RemoteInfo::parse_github_url("https://github.com/siranjeevanhope3/my-repo.git").unwrap();
+    let r2 =
+        RemoteInfo::parse_github_url("https://github.com/siranjeevanhope3/my-repo.git").unwrap();
     assert_eq!(r2.owner, "siranjeevanhope3");
     assert_eq!(r2.repository, "my-repo");
 
@@ -30,11 +31,22 @@ fn test_identity_guard_blocks_mismatched_remote_owner() {
         .generate_ed25519_keypair(&ssh_dir, "account_a", "account_a@github.com")
         .unwrap();
 
-    let account_a = Account::new("Account A", "account_a@github.com", "account_a", "github", "account_a");
+    let account_a = Account::new(
+        "Account A",
+        "account_a@github.com",
+        "account_a",
+        "github",
+        "account_a",
+    );
     let remote_b = "git@github.com:account_b/project-b.git";
 
     // Attempting to run operation with Account A on Account B's remote MUST FAIL CLOSED
-    let result = IdentityGuard::validate_operation(tmp.path(), &account_a, &keypair.private_key_path, Some(remote_b));
+    let result = IdentityGuard::validate_operation(
+        tmp.path(),
+        &account_a,
+        &keypair.private_key_path,
+        Some(remote_b),
+    );
     assert!(result.is_err());
 
     if let Err(GitNestError::IdentityMismatch(err_msg)) = result {
@@ -57,10 +69,21 @@ fn test_identity_guard_allows_matching_remote_owner() {
         .generate_ed25519_keypair(&ssh_dir, "account_a", "account_a@github.com")
         .unwrap();
 
-    let account_a = Account::new("Account A", "account_a@github.com", "account_a", "github", "account_a");
+    let account_a = Account::new(
+        "Account A",
+        "account_a@github.com",
+        "account_a",
+        "github",
+        "account_a",
+    );
     let remote_a = "git@github.com:account_a/project-a.git";
 
-    let result = IdentityGuard::validate_operation(tmp.path(), &account_a, &keypair.private_key_path, Some(remote_a));
+    let result = IdentityGuard::validate_operation(
+        tmp.path(),
+        &account_a,
+        &keypair.private_key_path,
+        Some(remote_a),
+    );
     assert!(result.is_ok());
 }
 
@@ -87,20 +110,37 @@ fn test_key_content_swap_attack() {
     hasher.update(pub_a_content.as_bytes());
     let fp_a = format!("{:x}", hasher.finalize());
 
-    let mut account_a = Account::new("Account A", "account_a@github.com", "account_a", "github", "key_a");
+    let mut account_a = Account::new(
+        "Account A",
+        "account_a@github.com",
+        "account_a",
+        "github",
+        "key_a",
+    );
     account_a.ssh_key_fingerprint = Some(fp_a);
 
     let remote_a = "git@github.com:account_a/project-a.git";
 
     // 1. Initial valid key check -> ALLOW
-    assert!(IdentityGuard::validate_operation(tmp.path(), &account_a, &keypair_a.private_key_path, Some(remote_a)).is_ok());
+    assert!(IdentityGuard::validate_operation(
+        tmp.path(),
+        &account_a,
+        &keypair_a.private_key_path,
+        Some(remote_a)
+    )
+    .is_ok());
 
     // 2. Perform Key Content Swap Attack: Replace key_a.pub with key_b.pub content
     let pub_b_content = std::fs::read_to_string(&keypair_b.public_key_path).unwrap();
     std::fs::write(&keypair_a.public_key_path, pub_b_content).unwrap();
 
     // 3. Validation must detect fingerprint mismatch and BLOCK
-    let swapped_result = IdentityGuard::validate_operation(tmp.path(), &account_a, &keypair_a.private_key_path, Some(remote_a));
+    let swapped_result = IdentityGuard::validate_operation(
+        tmp.path(),
+        &account_a,
+        &keypair_a.private_key_path,
+        Some(remote_a),
+    );
     assert!(swapped_result.is_err());
     if let Err(GitNestError::IdentityMismatch(msg)) = swapped_result {
         assert!(msg.contains("Key Swap / Tamper Detected!"));
@@ -110,7 +150,13 @@ fn test_key_content_swap_attack() {
 
     // 4. Restore original key_a content -> ALLOW
     std::fs::write(&keypair_a.public_key_path, pub_a_content).unwrap();
-    assert!(IdentityGuard::validate_operation(tmp.path(), &account_a, &keypair_a.private_key_path, Some(remote_a)).is_ok());
+    assert!(IdentityGuard::validate_operation(
+        tmp.path(),
+        &account_a,
+        &keypair_a.private_key_path,
+        Some(remote_a)
+    )
+    .is_ok());
 }
 
 #[test]

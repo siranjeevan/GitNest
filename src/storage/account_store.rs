@@ -45,8 +45,13 @@ impl JsonAccountRepository {
 impl AccountRepository for JsonAccountRepository {
     fn add(&mut self, account: Account) -> Result<()> {
         let mut accounts = load_accounts(&self.storage_path)?;
-        if accounts.iter().any(|a| a.github_username == account.github_username) {
-            return Err(GitNestError::AccountAlreadyExists(account.github_username.clone()));
+        if accounts
+            .iter()
+            .any(|a| a.github_username == account.github_username)
+        {
+            return Err(GitNestError::AccountAlreadyExists(
+                account.github_username.clone(),
+            ));
         }
         accounts.push(account);
         save_accounts(&self.storage_path, &accounts)
