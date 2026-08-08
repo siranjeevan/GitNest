@@ -232,6 +232,67 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     continue;
                 }
 
+                if state.show_clone_repo_modal {
+                    match key.code {
+                        KeyCode::Esc => state.show_clone_repo_modal = false,
+                        KeyCode::Down => {
+                            if !state.accounts.is_empty() && state.selected_clone_account_index < state.accounts.len() - 1 {
+                                state.selected_clone_account_index += 1;
+                            }
+                        }
+                        KeyCode::Up => {
+                            if state.selected_clone_account_index > 0 {
+                                state.selected_clone_account_index -= 1;
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            state.clone_repo_url.pop();
+                        }
+                        KeyCode::Char(c) => {
+                            if c != '\t' && c != '\n' && c != '\r' {
+                                state.clone_repo_url.push(c);
+                            }
+                        }
+                        KeyCode::Enter => {
+                            if state.clone_repo_url.trim().is_empty() {
+                                state.set_notification("Repository URL cannot be empty", true);
+                            } else if let Some(acc) = state.accounts.get(state.selected_clone_account_index).cloned() {
+                                let repo_url = state.clone_repo_url.trim().to_string();
+                                state.show_clone_repo_modal = false;
+
+                                let git_service = crate::services::GitService::new();
+                                let cwd = env::current_dir().unwrap_or_default();
+                                let ssh_service = SshService::new(config_mgr.ssh_dir());
+                                let key_path = ssh_service.resolve_key_path(&acc.key_id);
+
+                                state.set_notification(format!("Cloning repository with @{}...", acc.github_username), false);
+                                match git_service.clone_repo(&repo_url, &cwd, &key_path) {
+                                    Ok(cloned_path) => {
+                                        // Auto-map cloned project to account
+                                        if let Ok(proj) = project_service.map_project(&cloned_path, &acc.id).await {
+                                            state.active_project = Some(proj);
+                                            if let Ok(projects) = project_service.list_projects().await {
+                                                state.projects = projects;
+                                            }
+                                        }
+                                        state.set_notification(
+                                            format!("✓ Cloned repo to '{}' bound to @{}!", cloned_path.display(), acc.github_username),
+                                            false,
+                                        );
+                                    }
+                                    Err(e) => {
+                                        state.set_notification(format!("Clone failed: {}", e), true);
+                                    }
+                                }
+                            } else {
+                                state.set_notification("No account selected for cloning", true);
+                            }
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 if state.show_login_modal {
                     match (&state.login_phase, key.code) {
                         (LoginPhase::Ready, KeyCode::Esc) => {
@@ -399,6 +460,7 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                 if state.current_screen != Screen::CommandPalette
                     && state.current_screen != Screen::Accounts
                     && !state.show_create_repo_modal
+                    && !state.show_clone_repo_modal
                 {
                     match key.code {
                         KeyCode::Char('?') => {
@@ -460,7 +522,16 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                 }
                                 state.show_create_repo_modal = true;
                             },
-                            3 => state.current_screen = Screen::CloneRepo,
+                            3 => {
+                                state.clone_repo_url.clear();
+                                state.selected_clone_account_index = 0;
+                                if let Some(ref active) = state.active_account {
+                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                        state.selected_clone_account_index = pos;
+                                    }
+                                }
+                                state.show_clone_repo_modal = true;
+                            },
                             4 => state.current_screen = Screen::Accounts,
                             5 => state.current_screen = Screen::Projects,
                             6 => state.current_screen = Screen::Security,

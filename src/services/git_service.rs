@@ -82,6 +82,35 @@ impl GitService {
             Err(_) => Ok(false),
         }
     }
+
+    pub fn clone_repo(&self, repo_url: &str, target_dir: &Path, ssh_key_path: &Path) -> Result<std::path::PathBuf> {
+        let ssh_command = format!(
+            "ssh -i \"{}\" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
+            ssh_key_path.to_string_lossy()
+        );
+
+        let output = Command::new("git")
+            .args(["clone", repo_url])
+            .current_dir(target_dir)
+            .env("GIT_SSH_COMMAND", ssh_command)
+            .output()
+            .map_err(|e| GitNestError::GitExecutionFailed(format!("Failed to spawn git clone: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(GitNestError::GitExecutionFailed(format!("git clone failed: {}", stderr.trim())));
+        }
+
+        // Extract folder name from URL (e.g., git@github.com:user/repo.git -> repo)
+        let repo_name = repo_url
+            .trim_end_matches('/')
+            .trim_end_matches(".git")
+            .split('/')
+            .next_back()
+            .unwrap_or("cloned-repo");
+
+        Ok(target_dir.join(repo_name))
+    }
 }
 
 impl Default for GitService {
