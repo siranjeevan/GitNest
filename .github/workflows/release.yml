@@ -65,19 +65,19 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: gitnest-v1.0.0-macos-arm64.tar.gz
+            artifact_name: gitnest-${{ github.ref_name }}-macos-arm64.tar.gz
             asset_name: gitnest
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: gitnest-v1.0.0-macos-x86_64.tar.gz
+            artifact_name: gitnest-${{ github.ref_name }}-macos-x86_64.tar.gz
             asset_name: gitnest
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: gitnest-v1.0.0-linux-x86_64.tar.gz
+            artifact_name: gitnest-${{ github.ref_name }}-linux-x86_64.tar.gz
             asset_name: gitnest
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: gitnest-v1.0.0-windows-x86_64.zip
+            artifact_name: gitnest-${{ github.ref_name }}-windows-x86_64.zip
             asset_name: gitnest.exe
 
     steps:
