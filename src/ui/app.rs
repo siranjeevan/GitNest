@@ -348,6 +348,73 @@ fn render_connect_modal(f: &mut Frame, state: &AppState, area: Rect) {
     f.render_widget(p, popup_area);
 }
 
+fn render_create_repo_modal(f: &mut Frame, state: &AppState, area: Rect) {
+    let popup_area = Rect::new(
+        area.width / 6,
+        area.height / 5,
+        (area.width * 2) / 3,
+        (area.height * 3) / 5,
+    );
+    f.render_widget(Clear, popup_area);
+
+    let vis_str = if state.create_repo_is_private { "🔒 Private" } else { "🌐 Public" };
+
+    let mut text = vec![
+        Line::from(Span::styled("CREATE NEW GITHUB REPOSITORY", Theme::title())),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Repository Name: ", Style::default().fg(Theme::MUTED)),
+            Span::styled(
+                if state.create_repo_name.is_empty() { "Type name..." } else { state.create_repo_name.as_str() },
+                if state.create_repo_name.is_empty() { Style::default().fg(Theme::MUTED) } else { Style::default().fg(Theme::TEXT).add_modifier(Modifier::BOLD) },
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Visibility     : ", Style::default().fg(Theme::MUTED)),
+            Span::styled(vis_str, Style::default().fg(if state.create_repo_is_private { Theme::VIOLET } else { Theme::CYAN }).add_modifier(Modifier::BOLD)),
+            Span::styled("  (Press [Tab] to toggle Private / Public)", Style::default().fg(Theme::MUTED)),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled("  Select Account Owner: (↑/↓ to switch)", Style::default().fg(Theme::MUTED))),
+        Line::from(""),
+    ];
+
+    if state.accounts.is_empty() {
+        text.push(Line::from(Span::styled("  No registered accounts. Press 'a' to add an account first.", Theme::warning_badge())));
+    } else {
+        for (idx, acc) in state.accounts.iter().enumerate() {
+            let is_selected = idx == state.selected_create_account_index;
+            let prefix = if is_selected { "  ❯ ● " } else { "    ○ " };
+            let style = if is_selected {
+                Theme::active_item()
+            } else {
+                Theme::inactive_item()
+            };
+            text.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(
+                    format!("@{} ", acc.github_username),
+                    if is_selected { Style::default().fg(Theme::VIOLET).add_modifier(Modifier::BOLD) } else { Style::default().fg(Theme::TEXT) },
+                ),
+                Span::styled(format!("({})", acc.email), Style::default().fg(Theme::MUTED)),
+            ]));
+        }
+    }
+
+    text.push(Line::from(""));
+    text.push(Line::from(vec![
+        Span::styled("  [Enter] Create Repo     [Tab] Toggle Vis     [↑/↓] Change Account     [Esc] Cancel", Theme::success_badge()),
+    ]));
+
+    let p = Paragraph::new(text).block(
+        Block::default()
+            .title(" CREATE REPOSITORY ON GITHUB ")
+            .borders(Borders::ALL)
+            .border_style(Theme::border_active()),
+    );
+    f.render_widget(p, popup_area);
+}
+
 pub fn render_app(f: &mut Frame, state: &AppState) {
     let size = f.size();
 
@@ -389,6 +456,10 @@ pub fn render_app(f: &mut Frame, state: &AppState) {
 
     if state.show_connect_modal {
         render_connect_modal(f, state, size);
+    }
+
+    if state.show_create_repo_modal {
+        render_create_repo_modal(f, state, size);
     }
 
     if let Some(ref target_acc) = state.modal_switch_account {

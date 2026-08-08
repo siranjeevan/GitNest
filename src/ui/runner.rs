@@ -172,6 +172,66 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                     continue;
                 }
 
+                if state.show_create_repo_modal {
+                    match key.code {
+                        KeyCode::Esc => state.show_create_repo_modal = false,
+                        KeyCode::Tab => {
+                            state.create_repo_is_private = !state.create_repo_is_private;
+                        }
+                        KeyCode::Down => {
+                            if !state.accounts.is_empty() && state.selected_create_account_index < state.accounts.len() - 1 {
+                                state.selected_create_account_index += 1;
+                            }
+                        }
+                        KeyCode::Up => {
+                            if state.selected_create_account_index > 0 {
+                                state.selected_create_account_index -= 1;
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            state.create_repo_name.pop();
+                        }
+                        KeyCode::Char(c) => {
+                            if c != '\t' && c != '\n' && c != '\r' {
+                                state.create_repo_name.push(c);
+                            }
+                        }
+                        KeyCode::Enter => {
+                            if state.create_repo_name.trim().is_empty() {
+                                state.set_notification("Repository name cannot be empty", true);
+                            } else if let Some(acc) = state.accounts.get(state.selected_create_account_index).cloned() {
+                                let repo_name = state.create_repo_name.trim().to_string();
+                                let is_private = state.create_repo_is_private;
+                                state.show_create_repo_modal = false;
+
+                                // Fetch token from Keyring
+                                let secure_store = KeyringSecureStore::new();
+                                if let Ok(Some(token)) = secure_store.get_token(&acc.github_username) {
+                                    let config = config_mgr.load_config().unwrap_or_default();
+                                    let provider = GitHubProvider::new(&config.github.client_id);
+                                    match provider.create_repository(&token, &repo_name, is_private).await {
+                                        Ok(ssh_url) => {
+                                            state.set_notification(
+                                                format!("✓ Created {} repo '{}' on GitHub! URL: {}", if is_private { "private" } else { "public" }, repo_name, ssh_url),
+                                                false,
+                                            );
+                                        }
+                                        Err(e) => {
+                                            state.set_notification(format!("Failed to create repo: {}", e), true);
+                                        }
+                                    }
+                                } else {
+                                    state.set_notification(format!("OAuth token for @{} not found in Keychain. Re-login required.", acc.github_username), true);
+                                }
+                            } else {
+                                state.set_notification("No account selected for creation", true);
+                            }
+                        }
+                        _ => {}
+                    }
+                    continue;
+                }
+
                 if state.show_login_modal {
                     match (&state.login_phase, key.code) {
                         (LoginPhase::Ready, KeyCode::Esc) => {
@@ -386,7 +446,17 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                                 }
                                 state.show_connect_modal = true;
                             },
-                            2 => state.current_screen = Screen::CreateRepo,
+                            2 => {
+                                state.create_repo_name.clear();
+                                state.create_repo_is_private = true;
+                                state.selected_create_account_index = 0;
+                                if let Some(ref active) = state.active_account {
+                                    if let Some(pos) = state.accounts.iter().position(|a| a.id == active.id) {
+                                        state.selected_create_account_index = pos;
+                                    }
+                                }
+                                state.show_create_repo_modal = true;
+                            },
                             3 => state.current_screen = Screen::CloneRepo,
                             4 => state.current_screen = Screen::Accounts,
                             5 => state.current_screen = Screen::Projects,
