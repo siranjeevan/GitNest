@@ -1,9 +1,14 @@
 use crate::config::ConfigManager;
+use crate::domain::account::Account;
 use crate::domain::error::Result;
-use crate::services::{AccountService, ProjectService};
+use crate::providers::github::GitHubProvider;
+use crate::providers::r#trait::GitProvider;
+use crate::services::{AccountService, ProjectService, SshService};
+use crate::storage::secure_store::KeyringSecureStore;
+use crate::storage::secure_store::SecureStore;
 use crate::storage::{JsonAccountRepository, JsonProjectRepository};
 use crate::ui::app::render_app;
-use crate::ui::state::{AppState, Screen};
+use crate::ui::state::{AppState, LoginPhase, Screen};
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
@@ -129,14 +134,142 @@ pub async fn run_tui_dashboard(config_mgr: &ConfigManager) -> Result<()> {
                 }
 
                 if state.show_login_modal {
-                    match key.code {
-                        KeyCode::Esc => state.show_login_modal = false,
-                        KeyCode::Enter => {
+                    match (&state.login_phase, key.code) {
+                        (LoginPhase::Ready, KeyCode::Esc) => {
                             state.show_login_modal = false;
+                            state.login_phase = LoginPhase::Ready;
+                        }
+                        (LoginPhase::Ready, KeyCode::Enter) => {
+                            // Start the OAuth Device Flow
+                            let config = match config_mgr.load_config() {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    state.login_phase = LoginPhase::Error {
+                                        message: format!("Config error: {}", e),
+                                    };
+                                    continue;
+                                }
+                            };
+                            let provider = GitHubProvider::new(&config.github.client_id);
+
+                            // Request device code from GitHub
+                            terminal.draw(|f| render_app(f, &state)).ok();
+                            match provider.request_device_code().await {
+                                Ok(device_res) => {
+                                    let user_code = device_res.user_code.clone();
+                                    let verification_uri = device_res.verification_uri.clone();
+
+                                    // Copy code to clipboard
+                                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                        let _ = clipboard.set_text(&user_code);
+                                    }
+
+                                    // Open browser
+                                    let _ = open::that(&verification_uri);
+
+                                    // Update phase to show code & waiting status
+                                    state.login_phase = LoginPhase::WaitingForAuth {
+                                        user_code: user_code.clone(),
+                                        verification_uri,
+                                    };
+                                    terminal.draw(|f| render_app(f, &state)).ok();
+
+                                    // Poll for token (this blocks until authorized or error)
+                                    state.login_phase = LoginPhase::Polling {
+                                        user_code: user_code.clone(),
+                                    };
+                                    terminal.draw(|f| render_app(f, &state)).ok();
+
+                                    match provider.poll_for_token(&device_res.device_code, device_res.interval).await {
+                                        Ok(token) => {
+                                            // Fetch user info
+                                            match provider.fetch_user_info(&token).await {
+                                                Ok(provider_user) => {
+                                                    // Generate SSH key
+                                                    let ssh_service = SshService::new(config_mgr.ssh_dir());
+                                                    let key_id = format!("id_ed25519_{}", provider_user.username);
+                                                    let key_path = ssh_service.generate_keypair(
+                                                        &key_id,
+                                                        &format!("gitnest-{}", provider_user.username),
+                                                    );
+
+                                                    // Upload SSH key to GitHub
+                                                    if let Ok(ref kp) = key_path {
+                                                        let pub_path = format!("{}.pub", kp.to_string_lossy());
+                                                        if let Ok(pub_key_str) = std::fs::read_to_string(&pub_path) {
+                                                            let _ = provider.upload_ssh_key(
+                                                                &token,
+                                                                &format!("GitNest Key ({})", provider_user.username),
+                                                                &pub_key_str,
+                                                            ).await;
+                                                        }
+                                                    }
+
+                                                    // Store token in keychain
+                                                    let secure_store = KeyringSecureStore::new();
+                                                    let _ = secure_store.store_token(&provider_user.username, &token);
+
+                                                    // Register account
+                                                    let display_name = provider_user.name.unwrap_or_else(|| provider_user.username.clone());
+                                                    let account = Account::new(
+                                                        display_name,
+                                                        provider_user.email.clone(),
+                                                        provider_user.username.clone(),
+                                                        "github",
+                                                        key_id,
+                                                    );
+                                                    let _ = account_service.add_account(account).await;
+
+                                                    // Refresh accounts list
+                                                    if let Ok(updated) = account_service.list_accounts().await {
+                                                        state.accounts = updated;
+                                                    }
+
+                                                    state.login_phase = LoginPhase::Success {
+                                                        username: provider_user.username,
+                                                    };
+                                                }
+                                                Err(e) => {
+                                                    state.login_phase = LoginPhase::Error {
+                                                        message: format!("Failed to fetch user info: {}", e),
+                                                    };
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            state.login_phase = LoginPhase::Error {
+                                                message: format!("OAuth token poll failed: {}", e),
+                                            };
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    state.login_phase = LoginPhase::Error {
+                                        message: format!("Device code request failed: {}", e),
+                                    };
+                                }
+                            }
+                        }
+                        (LoginPhase::WaitingForAuth { .. } | LoginPhase::Polling { .. }, KeyCode::Esc) => {
+                            state.show_login_modal = false;
+                            state.login_phase = LoginPhase::Ready;
+                        }
+                        (LoginPhase::Success { ref username }, KeyCode::Enter | KeyCode::Esc) => {
+                            let uname = username.clone();
+                            state.show_login_modal = false;
+                            state.login_phase = LoginPhase::Ready;
                             state.set_notification(
-                                "Run `gitnest auth login` in terminal to execute GitHub OAuth Device login",
+                                format!("Account @{} registered successfully!", uname),
                                 false,
                             );
+                        }
+                        (LoginPhase::Error { .. }, KeyCode::Esc) => {
+                            state.show_login_modal = false;
+                            state.login_phase = LoginPhase::Ready;
+                        }
+                        (LoginPhase::Error { .. }, KeyCode::Enter) => {
+                            // Retry
+                            state.login_phase = LoginPhase::Ready;
                         }
                         _ => {}
                     }

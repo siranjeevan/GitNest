@@ -14,6 +14,29 @@ pub enum Screen {
     CommandPalette,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoginPhase {
+    /// Initial prompt: Press Enter to start
+    Ready,
+    /// Device code generated, browser opening, waiting for user to authorize
+    WaitingForAuth {
+        user_code: String,
+        verification_uri: String,
+    },
+    /// Polling GitHub for token
+    Polling {
+        user_code: String,
+    },
+    /// Successfully authenticated
+    Success {
+        username: String,
+    },
+    /// Error occurred
+    Error {
+        message: String,
+    },
+}
+
 pub struct AppState {
     pub current_screen: Screen,
     pub menu_index: usize,
@@ -30,6 +53,7 @@ pub struct AppState {
     pub modal_remove_account: Option<Account>,
     pub show_help_modal: bool,
     pub show_login_modal: bool,
+    pub login_phase: LoginPhase,
     pub spinner_frame: usize,
     pub notification: Option<(String, bool)>, // (message, is_error)
     pub should_quit: bool,
@@ -53,6 +77,7 @@ impl AppState {
             modal_remove_account: None,
             show_help_modal: false,
             show_login_modal: false,
+            login_phase: LoginPhase::Ready,
             spinner_frame: 0,
             notification: None,
             should_quit: false,
