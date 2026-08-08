@@ -6,12 +6,16 @@ use std::env;
 
 fn firebase_api_key() -> Option<String> {
     let _ = dotenvy::dotenv();
-    env::var("FIREBASE_API_KEY").ok()
+    env::var("FIREBASE_API_KEY")
+        .ok()
+        .or_else(|| Some("AIzaSyCjr1M0DW9TPwrKv_-LaGwq3Vvk5Ja0JJ4".to_string()))
 }
 
 fn firebase_project_id() -> Option<String> {
     let _ = dotenvy::dotenv();
-    env::var("FIREBASE_PROJECT_ID").ok()
+    env::var("FIREBASE_PROJECT_ID")
+        .ok()
+        .or_else(|| Some("projects-495f4".to_string()))
 }
 
 #[derive(Clone)]

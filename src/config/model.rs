@@ -11,6 +11,8 @@ pub struct Config {
     pub git: GitSettings,
     #[serde(default)]
     pub github: GitHubSettings,
+    #[serde(default)]
+    pub firebase: FirebaseSettings,
 }
 
 fn default_telemetry_enabled() -> bool {
@@ -45,6 +47,21 @@ impl Default for GitHubSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FirebaseSettings {
+    pub api_key: String,
+    pub project_id: String,
+}
+
+impl Default for FirebaseSettings {
+    fn default() -> Self {
+        Self {
+            api_key: "AIzaSyCjr1M0DW9TPwrKv_-LaGwq3Vvk5Ja0JJ4".to_string(),
+            project_id: "projects-495f4".to_string(),
+        }
+    }
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -54,6 +71,7 @@ impl Default for Config {
             telemetry_enabled: true,
             git: GitSettings::default(),
             github: GitHubSettings::default(),
+            firebase: FirebaseSettings::default(),
         }
     }
 }
